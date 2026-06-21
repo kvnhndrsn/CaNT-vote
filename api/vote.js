@@ -1,5 +1,5 @@
+import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { ed25519 } from '@noble/ed25519';
 import { blake2b } from '@noble/hashes/blake2b';
 import { bech32 } from 'bech32';
 
@@ -177,10 +177,18 @@ async function verifyCIP8({ address, payload, signature, key }) {
     signedPayload,
   ]);
 
-  const isValid = await ed25519.verify(
-    sigValue,
-    sigStructure,
-    publicKey
+  const isValid = crypto.verify(
+    null,
+    Buffer.from(sigStructure),
+    crypto.createPublicKey({
+      key: Buffer.concat([
+        Buffer.from('302a300506032b6570032100', 'hex'),
+        Buffer.from(publicKey),
+      ]),
+      format: 'der',
+      type: 'spki',
+    }),
+    Buffer.from(sigValue)
   );
   if (!isValid) throw new Error('Signature verification failed');
 
