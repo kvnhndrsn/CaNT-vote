@@ -1,5 +1,9 @@
 import { bech32 } from 'bech32';
 
+console.log('[app] module loaded');
+console.log('[app] wallet button:', $('#connectBtn'));
+console.log('[app] vote button:', $('#voteSubmitBtn'));
+
 const KNOWN_WALLETS = [
   { id: 'eternl', name: 'Eternl', icon: 'E' },
   { id: 'nami', name: 'Nami', icon: 'N' },
@@ -269,20 +273,28 @@ async function openVoteModal(proposalId) {
   }
 }
 
-$('#voteSubmitBtn').addEventListener('click', submitVote);
+console.log('[vote] attaching listener for #voteSubmitBtn');
+const voteBtn = $('#voteSubmitBtn');
+console.log('[vote] button element:', voteBtn);
+voteBtn?.addEventListener('click', submitVote);
+console.log('[vote] listener attached');
 
 async function submitVote() {
-  const selected = $('#voteOptions input[name="voteChoice"]:checked');
-  if (!selected) {
-    toast('Select a voting option', 'error');
-    return;
-  }
-
-  const btn = $('#voteSubmitBtn');
-  btn.disabled = true;
-  btn.textContent = 'Signing...';
-
+  console.log('[vote] submitVote called');
   try {
+    const selected = $('#voteOptions input[name="voteChoice"]:checked');
+    console.log('[vote] selected:', selected);
+    if (!selected) {
+      toast('Select a voting option', 'error');
+      return;
+    }
+
+    const btn = $('#voteSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Signing...';
+
+    console.log('[vote] state:', { api: !!state.api, hexAddr: state.hexAddress?.slice(0, 20), addr: state.address?.slice(0, 20) });
+
     const proposal = state.currentProposal;
     const choice = selected.value;
     const payload = JSON.stringify({
@@ -292,7 +304,11 @@ async function submitVote() {
     });
 
     const hexPayload = bytesToHex(new TextEncoder().encode(payload));
+    console.log('[vote] calling signData with hexPayload:', hexPayload.slice(0, 30) + '...');
+
+    console.log('[vote] signData typeof:', typeof state.api?.signData);
     const result = await state.api.signData(state.hexAddress, hexPayload);
+    console.log('[vote] signData result keys:', Object.keys(result));
 
     const voteRes = await fetch('/api/vote', {
       method: 'POST',
@@ -307,6 +323,7 @@ async function submitVote() {
       }),
     });
 
+    console.log('[vote] server response status:', voteRes.status);
     const data = await voteRes.json();
     if (!voteRes.ok) throw new Error(data.error);
 
@@ -314,10 +331,11 @@ async function submitVote() {
     $('#voteModal').classList.remove('open');
     fetchProposals();
   } catch (e) {
+    console.error('[vote] error:', e);
     toast('Vote failed: ' + e.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Sign & Submit Vote';
+    const btn = $('#voteSubmitBtn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign & Submit Vote'; }
   }
 }
 
