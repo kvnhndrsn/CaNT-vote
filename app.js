@@ -17,9 +17,11 @@ const state = {
   wallet: null,
   api: null,
   address: null,
+  addresses: [],
   hexAddress: null,
   proposals: [],
   currentProposal: null,
+  filterToken: '',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -45,6 +47,16 @@ function formatWeight(w) {
   return n.toString();
 }
 
+function pctStr(part, total) {
+  if (!total || total === '0') return '0%';
+  return (Number(BigInt(part)) / Number(BigInt(total)) * 100).toFixed(1) + '%';
+}
+
+function pctNum(part, total) {
+  if (!total || total === '0') return 0;
+  return Number(BigInt(part)) / Number(BigInt(total)) * 100;
+}
+
 /* ---------- Proposals ---------- */
 
 async function fetchProposals() {
@@ -55,6 +67,7 @@ async function fetchProposals() {
       throw new Error(body.error || `Server error (${res.status})`);
     }
     state.proposals = await res.json();
+    renderFilter();
     renderProposals();
   } catch (e) {
     console.error(e);
@@ -63,30 +76,112 @@ async function fetchProposals() {
   }
 }
 
+function renderFilter() {
+  const tokens = {};
+  for (const p of state.proposals) {
+    const id = p.target_policy_id || 'ADA';
+    if (!tokens[id]) {
+      tokens[id] = {
+        label: id === 'ADA' ? 'ADA' : (p.tokenName || shorten(id, 8)),
+        image: id === 'ADA' ? null : (p.tokenImage || null),
+        id,
+      };
+    }
+  }
+  const list = Object.values(tokens);
+  const container = $('#tokenFilter');
+  if (list.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="filter-row">
+      <label>Token:</label>
+      <select id="tokenSelect">
+        <option value="">All Tokens (${state.proposals.length})</option>
+        ${list.map(t => `
+          <option value="${escHtml(t.id)}" ${state.filterToken === t.id ? 'selected' : ''}>
+            ${escHtml(t.label)}
+          </option>
+        `).join('')}
+      </select>
+    </div>
+  `;
+  $('#tokenSelect').addEventListener('change', (e) => {
+    state.filterToken = e.target.value;
+    renderProposals();
+  });
+}
+
 function renderProposals() {
   const list = $('#proposalList');
   const count = $('#proposalCount');
-  count.textContent = state.proposals.length;
+  const filtered = state.filterToken
+    ? state.proposals.filter(p => (state.filterToken === 'ADA' ? !p.target_policy_id : p.target_policy_id === state.filterToken))
+    : state.proposals;
+  count.textContent = filtered.length;
 
-  if (state.proposals.length === 0) {
+  if (filtered.length === 0) {
     list.innerHTML =
-      '<div class="empty-state"><strong>No proposals yet</strong><p>Be the first to create one!</p></div>';
+      '<div class="empty-state"><strong>No proposals</strong><p>' +
+      (state.filterToken ? 'No proposals for this token yet.' : 'Be the first to create one!') +
+      '</p></div>';
     return;
   }
 
-  list.innerHTML = state.proposals.map(p => {
-    const assetLabel = p.target_asset_name
+  list.innerHTML = filtered.map(p => {
+    const isADA = !p.target_policy_id;
+    const assetLabel = isADA ? 'ADA' : (p.tokenName || (p.target_asset_name
       ? shorten(p.target_policy_id, 6) + '.' + p.target_asset_name
-      : shorten(p.target_policy_id, 6);
+      : shorten(p.target_policy_id, 6)));
+
+    const summary = p.voteSummary || {};
+    const total = BigInt(p.totalVoteWeight || '0');
+    const choices = Object.entries(summary);
+
+    let tallyHtml = '';
+    if (choices.length > 0) {
+      const supply = p.circulatingSupply ? BigInt(p.circulatingSupply) : null;
+      const pctOfSupply = supply && supply > 0n
+        ? (Number(total) / Number(supply) * 100).toFixed(2) + '%'
+        : null;
+
+      tallyHtml = `
+        <div class="card-tally">
+          ${choices.map(([choice, weight]) => {
+            const pct = pctNum(weight, total.toString());
+            return `
+              <div class="card-tally-row">
+                <span class="card-tally-label">${escHtml(choice)}</span>
+                <span class="card-tally-bar"><span style="width:${pct}%"></span></span>
+                <span class="card-tally-pct">${pctStr(weight, total.toString())}</span>
+              </div>
+            `;
+          }).join('')}
+          <div class="card-tally-total">
+            Total: ${formatWeight(total.toString())} vote(s)
+            ${pctOfSupply ? `&middot; ${pctOfSupply} of supply` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    const imgHtml = p.tokenImage
+      ? `<img class="token-thumb" src="${escHtml(p.tokenImage)}" alt="" onerror="this.style.display='none'">`
+      : '';
+
     return `
       <div class="proposal-card" data-id="${p.id}">
-        <h3>${escHtml(p.title)}</h3>
-        <div class="meta">
-          <span>${assetLabel}</span>
-          <span>Snapshot: #${p.snapshot_block}</span>
-          <span>by ${shorten(p.creator_address, 6)}</span>
+        <div class="card-header">
+          ${imgHtml}
+          <div>
+            <h3>${escHtml(p.title)}</h3>
+            <div class="meta">
+              <span>${escHtml(assetLabel)}</span>
+              <span>Snapshot: #${p.snapshot_block}</span>
+              <span>by ${shorten(p.creator_address, 6)}</span>
+            </div>
+          </div>
         </div>
         <div class="desc">${escHtml(p.description)}</div>
+        ${tallyHtml}
         <div class="actions">
           <button class="btn btn-sm btn-primary vote-btn">Vote</button>
           <button class="btn btn-sm audit-btn">Audit</button>
@@ -163,15 +258,14 @@ async function connectWallet(walletId) {
     const api = await ext.enable();
     const usedAddrs = await api.getUsedAddresses();
     const rewardAddrs = await api.getRewardAddresses();
-    const rawHex = usedAddrs[0] || rewardAddrs[0];
-    if (!rawHex) throw new Error('No address returned');
-
-    const addr = hexToBech32(rawHex);
+    const allHex = usedAddrs.length > 0 ? usedAddrs : rewardAddrs;
+    if (allHex.length === 0) throw new Error('No address returned');
 
     state.wallet = walletId;
     state.api = api;
-    state.address = addr;
-    state.hexAddress = rawHex;
+    state.addresses = allHex.map(h => hexToBech32(h));
+    state.address = state.addresses[0];
+    state.hexAddress = allHex[0];
 
     updateWalletUI();
     toast('Connected: ' + shorten(addr, 8), 'success');
@@ -214,6 +308,7 @@ function disconnectWallet() {
   state.wallet = null;
   state.api = null;
   state.address = null;
+  state.addresses = [];
   state.hexAddress = null;
   updateWalletUI();
   toast('Disconnected');
@@ -234,41 +329,39 @@ async function openVoteModal(proposalId) {
     state.currentProposal = proposal;
 
     $('#voteModalTitle').textContent = proposal.title;
-    $('#voteTokenInfo').textContent = `Snapshot: #${proposal.snapshot_block}`;
 
-    const assetId = proposal.target_policy_id + (proposal.target_asset_name || '');
-    const tokenLabel = proposal.target_asset_name
+    const isADA = !proposal.target_policy_id;
+    const assetId = isADA ? 'lovelace' : (proposal.target_policy_id + (proposal.target_asset_name || ''));
+    const tokenLabel = isADA ? 'ADA' : (proposal.tokenName || (proposal.target_asset_name
       ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
-      : shorten(proposal.target_policy_id, 6);
+      : shorten(proposal.target_policy_id, 6)));
 
-    $('#voteTokenSelector').innerHTML = `
-      <label class="token-option selected" data-token="lovelace">
-        <input type="radio" name="tokenUnit" value="lovelace" checked>
-        <span>ADA</span>
-      </label>
-      <label class="token-option" data-token="${escHtml(assetId)}">
-        <input type="radio" name="tokenUnit" value="${escHtml(assetId)}">
-        <span>${escHtml(tokenLabel)}</span>
-      </label>
+    const supplyInfo = proposal.circulatingSupply
+      ? `Circulating: ${formatWeight(proposal.circulatingSupply)}`
+      : '';
+
+    const imgHtml = proposal.tokenImage
+      ? `<img class="token-logo" src="${escHtml(proposal.tokenImage)}" alt="" onerror="this.style.display='none'">`
+      : '';
+
+    $('#voteTokenInfo').innerHTML = `
+      ${imgHtml}
+      <span>Snapshot: #${proposal.snapshot_block} &middot; ${escHtml(tokenLabel)}${supplyInfo ? ' &middot; ' + supplyInfo : ''}</span>
     `;
-
-    $('#voteTokenSelector').querySelectorAll('.token-option').forEach(el => {
-      el.addEventListener('click', () => {
-        $('#voteTokenSelector').querySelectorAll('.token-option').forEach(o => o.classList.remove('selected'));
-        el.classList.add('selected');
-        el.querySelector('input').checked = true;
-      });
-    });
 
     const optionsDiv = $('#voteOptions');
     if (proposal.tally && Object.keys(proposal.tally).length > 0) {
       const total = BigInt(proposal.totalWeight || 0);
+      const supply = proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null;
       optionsDiv.innerHTML = Object.entries(proposal.tally).map(([choice, weight]) => {
-        const pct = total > 0n ? (Number(BigInt(weight)) / Number(total) * 100).toFixed(1) : 0;
+        const pct = total > 0n ? pctNum(weight, proposal.totalWeight) : 0;
+        const supplyPct = supply && supply > 0n
+          ? ' (' + (Number(BigInt(weight)) / Number(supply) * 100).toFixed(2) + '% of supply)'
+          : '';
         return `
           <label class="vote-option" data-choice="${escHtml(choice)}">
             <input type="radio" name="voteChoice" value="${escHtml(choice)}">
-            <span>${escHtml(choice)} (${formatWeight(weight)} — ${pct}%)</span>
+            <span>${escHtml(choice)}: ${formatWeight(weight)} (${pct.toFixed(1)}%)${supplyPct}</span>
           </label>
         `;
       }).join('');
@@ -284,6 +377,34 @@ async function openVoteModal(proposalId) {
     optionsDiv.querySelectorAll('.vote-option').forEach(el => {
       el.addEventListener('click', () => {
         optionsDiv.querySelectorAll('.vote-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        el.querySelector('input').checked = true;
+      });
+    });
+
+    if (isADA) {
+      $('#voteTokenSelector').innerHTML = `
+        <label class="token-option selected">
+          <input type="radio" name="tokenUnit" value="lovelace" checked>
+          <span>ADA</span>
+        </label>
+      `;
+    } else {
+      $('#voteTokenSelector').innerHTML = `
+        <label class="token-option selected">
+          <input type="radio" name="tokenUnit" value="lovelace" checked>
+          <span>ADA</span>
+        </label>
+        <label class="token-option">
+          <input type="radio" name="tokenUnit" value="${escHtml(assetId)}">
+          <span>${escHtml(tokenLabel)}</span>
+        </label>
+      `;
+    }
+
+    $('#voteTokenSelector').querySelectorAll('.token-option').forEach(el => {
+      el.addEventListener('click', () => {
+        $('#voteTokenSelector').querySelectorAll('.token-option').forEach(o => o.classList.remove('selected'));
         el.classList.add('selected');
         el.querySelector('input').checked = true;
       });
@@ -338,6 +459,7 @@ async function submitVote() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         address: state.address,
+        addresses: state.addresses,
         payload,
         signature: result.signature,
         key: result.key,
@@ -429,6 +551,10 @@ $('#createBtn').addEventListener('click', () => {
   $('#createModal').classList.add('open');
 });
 
+$('#propPolicy').addEventListener('input', () => {
+  $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+});
+
 $('#createSubmitBtn').addEventListener('click', createProposal);
 
 async function createProposal() {
@@ -438,8 +564,8 @@ async function createProposal() {
   const asset = $('#propAsset').value.trim();
   const blockInput = $('#propBlock').value.trim();
 
-  if (!title || !description || !policy) {
-    toast('Fill in title, description, and policy ID', 'error');
+  if (!title || !description) {
+    toast('Fill in title and description', 'error');
     return;
   }
 

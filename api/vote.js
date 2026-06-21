@@ -33,8 +33,9 @@ export default async function handler(req, res) {
 
     log(id, 'body', { type: typeof req.body, keys: req.body ? Object.keys(req.body) : [] });
 
-    const { address, payload, signature, key, proposalId, choice, tokenUnit } = req.body || {};
+    const { address, addresses, payload, signature, key, proposalId, choice, tokenUnit } = req.body || {};
     const unit = tokenUnit || 'lovelace';
+    const addrsToCheck = Array.isArray(addresses) && addresses.length > 0 ? addresses : [address];
 
     if (!address || !payload || !signature || !key || !proposalId || !choice) {
       return res.status(400).json({
@@ -72,56 +73,71 @@ export default async function handler(req, res) {
     const blockfrostUrl = `https://cardano-${BLOCKFROST_NET}.blockfrost.io/api/v0`;
     const bfHeaders = { project_id: BLOCKFROST_KEY };
 
-    log(id, 'bf-start', { unit, address: address.slice(0, 12) + '...' });
     let totalBalance = 0n;
-    let page = 1;
-    let hasMore = true;
 
-    while (hasMore) {
-      const utxoPath = unit === 'lovelace'
-        ? `${address}/utxos`
-        : `${address}/utxos/${unit}`;
-      const url = `${blockfrostUrl}/addresses/${utxoPath}?page=${page}&count=100`;
-      log(id, 'bf-fetch', { page, url: url.slice(0, 80) + '...' });
+    for (const addr of addrsToCheck) {
+      log(id, 'bf-start', { unit, address: addr.slice(0, 12) + '...' });
+      let page = 1;
+      let hasMore = true;
 
-      const resp = await fetch(url, { headers: bfHeaders });
-      log(id, 'bf-resp', { status: resp.status, ok: resp.ok });
+      while (hasMore) {
+        const utxoPath = unit === 'lovelace'
+          ? `${addr}/utxos`
+          : `${addr}/utxos/${unit}`;
+        const url = `${blockfrostUrl}/addresses/${utxoPath}?page=${page}&count=100`;
+        log(id, 'bf-fetch', { page, url: url.slice(0, 80) + '...' });
 
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        log(id, 'bf-err-body', { text: text.slice(0, 200) });
-        break;
-      }
+        const resp = await fetch(url, { headers: bfHeaders });
+        log(id, 'bf-resp', { status: resp.status, ok: resp.ok });
 
-      const utxos = await resp.json();
-      log(id, 'bf-data', { count: utxos.length, isArray: Array.isArray(utxos) });
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '');
+          log(id, 'bf-err-body', { text: text.slice(0, 200) });
+          break;
+        }
 
-      if (!Array.isArray(utxos) || utxos.length === 0) break;
+        const utxos = await resp.json();
+        log(id, 'bf-data', { count: utxos.length, isArray: Array.isArray(utxos) });
 
-      for (const utxo of utxos) {
-        if (utxo.block_height <= proposal.snapshot_block) {
-          if (unit === 'lovelace') {
-            const adaAmount = utxo.amount.find(a => a.unit === 'lovelace');
-            if (adaAmount) {
-              totalBalance += BigInt(adaAmount.quantity);
-            }
-          } else {
-            const amount = utxo.amount.find(a => a.unit === unit);
-            if (amount) {
-              totalBalance += BigInt(amount.quantity);
-              log(id, 'found-utxo', { qty: amount.quantity, block: utxo.block_height });
+        if (!Array.isArray(utxos) || utxos.length === 0) break;
+
+        for (const utxo of utxos) {
+          if (utxo.block_height <= proposal.snapshot_block) {
+            if (unit === 'lovelace') {
+              const adaAmount = utxo.amount.find(a => a.unit === 'lovelace');
+              if (adaAmount) {
+                totalBalance += BigInt(adaAmount.quantity);
+              }
+            } else {
+              const amount = utxo.amount.find(a => a.unit === unit);
+              if (amount) {
+                totalBalance += BigInt(amount.quantity);
+                log(id, 'found-utxo', { qty: amount.quantity, block: utxo.block_height });
+              }
             }
           }
         }
+        hasMore = utxos.length === 100;
+        page++;
       }
-      hasMore = utxos.length === 100;
-      page++;
     }
 
-    log(id, 'balance-done', { total: totalBalance.toString(), unit });
+    log(id, 'balance-done', { total: totalBalance.toString(), unit, addrCount: addrsToCheck.length });
 
     if (totalBalance <= 0n) {
-      return res.status(403).json({ error: `No ${unit === 'lovelace' ? 'ADA' : 'token'} balance held at snapshot block` });
+      let currentBalance = 'unknown';
+      try {
+        const debugAddr = addrsToCheck[0];
+        const dbgResp = await fetch(`${blockfrostUrl}/addresses/${debugAddr}`, { headers: bfHeaders });
+        if (dbgResp.ok) {
+          const dbgInfo = await dbgResp.json();
+          currentBalance = dbgInfo.total_balance || dbgInfo.controlled_amount || '0';
+        }
+      } catch {}
+      return res.status(403).json({
+        error: `No ${unit === 'lovelace' ? 'ADA' : 'token'} balance held at snapshot block`,
+        debug: { snapshot_block: proposal.snapshot_block, unit, addrCount: addrsToCheck.length, currentBalance }
+      });
     }
 
     log(id, 'upsert-vote');

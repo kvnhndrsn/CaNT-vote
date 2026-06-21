@@ -5,11 +5,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+function ipfsToHttp(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('ipfs://')) return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+  return url;
+}
+
+function formatAssetId(proposal) {
+  if (!proposal.target_policy_id) return null;
+  return `${proposal.target_policy_id}${proposal.target_asset_name || ''}`;
+}
+
+async function fetchAssetInfo(assetId) {
+  if (!assetId) return null;
+  const bfUrl = `https://cardano-${process.env.BLOCKFROST_NETWORK || 'mainnet'}.blockfrost.io/api/v0`;
+  const bfKey = process.env.BLOCKFROST_API_KEY;
+  if (!bfKey) return null;
+  try {
+    const resp = await fetch(`${bfUrl}/assets/${assetId}`, {
+      headers: { project_id: bfKey },
+    });
+    if (!resp.ok) return null;
+    const info = await resp.json();
+    return {
+      supply: info.quantity,
+      name: info.onchain_metadata?.name || null,
+      image: ipfsToHttp(info.onchain_metadata?.image || null),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-    return res.status(500).json({ error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.' });
+    return res.status(500).json({ error: 'Supabase not configured.' });
   }
 
   try {
@@ -44,11 +76,17 @@ export default async function handler(req, res) {
           formattedTally[choice] = weight.toString();
         }
 
+        const assetId = formatAssetId(proposal);
+        const assetInfo = await fetchAssetInfo(assetId);
+
         return res.json({
           ...proposal,
           voterCount: votes.length,
           totalWeight: totalWeight.toString(),
           tally: formattedTally,
+          circulatingSupply: assetInfo?.supply || null,
+          tokenName: assetInfo?.name || null,
+          tokenImage: assetInfo?.image || null,
         });
       }
 
@@ -58,13 +96,55 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      if (data.length === 0) return res.json([]);
+
+      const ids = data.map(p => p.id);
+      const { data: votes } = await supabase
+        .from('votes')
+        .select('proposal_id, vote_choice, stake_weight')
+        .in('proposal_id', ids);
+
+      const summaries = {};
+      if (votes) {
+        for (const v of votes) {
+          if (!summaries[v.proposal_id]) summaries[v.proposal_id] = {};
+          summaries[v.proposal_id][v.vote_choice] =
+            (summaries[v.proposal_id][v.vote_choice] || 0n) + BigInt(v.stake_weight);
+        }
+      }
+
+      const uniqueAssets = [...new Set(data.map(p => formatAssetId(p)))];
+      const assetInfos = {};
+      await Promise.all(uniqueAssets.filter(id => id).map(async (assetId) => {
+        const info = await fetchAssetInfo(assetId);
+        if (info) assetInfos[assetId] = info;
+      }));
+
+      data.forEach(p => {
+        const s = summaries[p.id] || {};
+        const weights = Object.values(s).map(v => typeof v === 'bigint' ? v : BigInt(v));
+        const total = weights.reduce((a, b) => a + b, 0n);
+        const formatted = {};
+        for (const [choice, weight] of Object.entries(s)) {
+          formatted[choice] = (typeof weight === 'bigint' ? weight : BigInt(weight)).toString();
+        }
+        p.voteSummary = formatted;
+        p.totalVoteWeight = total.toString();
+        const assetId = formatAssetId(p);
+        const ai = assetInfos[assetId] || {};
+        p.circulatingSupply = ai.supply || null;
+        p.tokenName = ai.name || null;
+        p.tokenImage = ai.image || null;
+      });
+
       return res.json(data);
     }
 
     if (req.method === 'POST') {
       let { title, description, targetPolicyId, targetAssetName, snapshotBlock, creatorAddress } = req.body;
 
-      if (!title || !description || !targetPolicyId || !creatorAddress) {
+      if (!title || !description || !creatorAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 

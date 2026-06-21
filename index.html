@@ -25,6 +25,7 @@
       Active Proposals
       <span class="badge" id="proposalCount">0</span>
     </div>
+    <div id="tokenFilter"></div>
     <div id="proposalList"></div>
   </div>
 </main>
@@ -51,11 +52,11 @@
       <textarea id="propDesc" placeholder="Describe your proposal..."></textarea>
     </div>
     <div class="form-group">
-      <label>Token Policy ID</label>
-      <input type="text" id="propPolicy" placeholder="64-char hex policy ID">
+      <label>Token Policy ID <span class="tooltip">(optional, leave empty for ADA)</span></label>
+      <input type="text" id="propPolicy" placeholder="64-char hex policy ID — empty = ADA">
     </div>
-    <div class="form-group">
-      <label>Asset Name (hex, optional for ADA)</label>
+    <div class="form-group" id="propAssetGroup" style="display:none">
+      <label>Asset Name (hex)</label>
       <input type="text" id="propAsset" placeholder="Leave empty for default policy token">
     </div>
     <div class="form-group">
