@@ -18,12 +18,15 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    const { id } = req.query;
+    const { proposalId } = req.query;
+    if (!proposalId) {
+      return res.status(400).json({ error: 'Missing proposalId query param' });
+    }
 
     const { data: proposal, error: propErr } = await supabase
       .from('proposals')
       .select('id, title, target_policy_id, target_asset_name, snapshot_block, snapshot_slot, created_at')
-      .eq('id', id)
+      .eq('id', proposalId)
       .single();
 
     if (propErr || !proposal) {
@@ -33,7 +36,7 @@ export default async function handler(req, res) {
     const { data: votes, error: votesErr } = await supabase
       .from('votes')
       .select('voter_address, vote_choice, stake_weight, signature_hex, key_hex, created_at')
-      .eq('proposal_id', id)
+      .eq('proposal_id', proposalId)
       .order('created_at', { ascending: true });
 
     if (votesErr) throw votesErr;

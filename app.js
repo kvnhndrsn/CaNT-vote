@@ -329,7 +329,7 @@ function bytesToHex(bytes) {
 
 async function openAuditModal(proposalId) {
   try {
-    const res = await fetch(`/api/proposals/${proposalId}/audit`);
+    const res = await fetch(`/api/audit?proposalId=${proposalId}`);
     if (!res.ok) throw new Error('Audit data not found');
     const data = await res.json();
 
