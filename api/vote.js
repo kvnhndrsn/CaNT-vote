@@ -1,7 +1,5 @@
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { blake2b } from '@noble/hashes/blake2b';
-import { bech32 } from 'bech32';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -24,17 +22,16 @@ function decodeItem(buf, off) {
   const mt = buf[off] >> 5;
   const [val, next] = readArg(buf, off);
 
-  if (mt === 0) return [val, next];                   // unsigned int
-  if (mt === 1) return [-1 - val, next];               // negative int
-  if (mt === 2) {                                      // byte string
-    const slice = buf.slice(next, next + val);
-    return [slice, next + val];
+  if (mt === 0) return [val, next];
+  if (mt === 1) return [-1 - val, next];
+  if (mt === 2) {
+    return [buf.slice(next, next + val), next + val];
   }
-  if (mt === 3) {                                      // text string
+  if (mt === 3) {
     const slice = buf.slice(next, next + val);
     return [new TextDecoder().decode(slice), next + val];
   }
-  if (mt === 4) {                                      // array
+  if (mt === 4) {
     const arr = [];
     let pos = next;
     for (let i = 0; i < val; i++) {
@@ -44,7 +41,7 @@ function decodeItem(buf, off) {
     }
     return [arr, pos];
   }
-  if (mt === 5) {                                      // map
+  if (mt === 5) {
     const map = new Map();
     let pos = next;
     for (let i = 0; i < val; i++) {
@@ -55,9 +52,7 @@ function decodeItem(buf, off) {
     }
     return [map, pos];
   }
-  if (mt === 7 && val === 20) return [false, next];    // false
-  if (mt === 7 && val === 21) return [true, next];      // true
-  if (mt === 7 && val === 22) return [null, next];      // null
+  if (mt === 7 && val === 22) return [null, next];
   throw new Error('CBOR: unsupported major type ' + mt);
 }
 
@@ -118,34 +113,24 @@ function encodeArray(items) {
 
 function encodeAny(val) {
   if (typeof val === 'string') return encodeText(val);
-  if (val instanceof Uint8Array || val instanceof Buffer || Array.isArray(val)) {
-    const bytes = val instanceof Uint8Array ? val : new Uint8Array(val);
-    return encodeBytes(bytes);
+  if (val instanceof Uint8Array) return encodeBytes(val);
+  if (val === null || val === undefined) return Uint8Array.of(0xf6);
+  throw new Error('CBOR encode: unsupported type');
+}
+
+/* Helpers */
+
+function hexToBytes(hex) {
+  const bytes = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(parseInt(hex.slice(i, i + 2), 16));
   }
-  if (val === null || val === undefined) {
-    return Uint8Array.of(0xf6);
-  }
-  if (typeof val === 'number') {
-    if (val >= 0) {
-      const head = encodeHead(0, val);
-      return head.length === 1 ? head : head;
-    }
-    return Uint8Array.of(0x20); // simplified for -1 only
-  }
-  throw new Error('CBOR encode: unsupported type ' + typeof val);
+  return new Uint8Array(bytes);
 }
 
 /* CIP-8 Verification */
 
-function hexToBytes(hex) {
-  return new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-}
-
-function bytesToHex(bytes) {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function verifyCIP8({ address, payload, signature, key }) {
+async function verifyCIP8({ payload, signature, key }) {
   const sigBytes = hexToBytes(signature);
   const keyBytes = hexToBytes(key);
   const payloadBytes = new TextEncoder().encode(payload);
@@ -154,9 +139,12 @@ async function verifyCIP8({ address, payload, signature, key }) {
   if (!Array.isArray(coseSign1) || coseSign1.length !== 4) {
     throw new Error('Invalid COSE_Sign1 structure');
   }
-  const [protectedBytes, unprotected, signedPayload, sigValue] = coseSign1;
+  const [protectedBytes, , signedPayload, sigValue] = coseSign1;
 
-  if (!(signedPayload instanceof Uint8Array) || bytesToHex(signedPayload) !== bytesToHex(payloadBytes)) {
+  if (!(signedPayload instanceof Uint8Array)) {
+    throw new Error('Signed payload is not byte string');
+  }
+  if (Buffer.compare(Buffer.from(signedPayload), Buffer.from(payloadBytes)) !== 0) {
     throw new Error('Signed payload does not match original message');
   }
 
@@ -169,49 +157,19 @@ async function verifyCIP8({ address, payload, signature, key }) {
   }
   if (!publicKey) throw new Error('Could not extract public key from COSE_Key');
 
-  const externalAad = new Uint8Array(0);
   const sigStructure = encodeArray([
     'Signature1',
     protectedBytes,
-    externalAad,
+    new Uint8Array(0),
     signedPayload,
   ]);
 
-  const isValid = crypto.verify(
-    null,
-    Buffer.from(sigStructure),
-    crypto.createPublicKey({
-      key: Buffer.concat([
-        Buffer.from('302a300506032b6570032100', 'hex'),
-        Buffer.from(publicKey),
-      ]),
-      format: 'der',
-      type: 'spki',
-    }),
-    Buffer.from(sigValue)
-  );
+  const spkiPrefix = Buffer.from('302a300506032b6570032100', 'hex');
+  const derKey = Buffer.concat([spkiPrefix, Buffer.from(publicKey)]);
+  const keyObject = crypto.createPublicKey({ key: derKey, format: 'der', type: 'spki' });
+
+  const isValid = crypto.verify(null, Buffer.from(sigStructure), keyObject, Buffer.from(sigValue));
   if (!isValid) throw new Error('Signature verification failed');
-
-  const keyHash = blake2b(publicKey, { dkLen: 28 });
-
-  let decoded;
-  try {
-    decoded = bech32.decode(address);
-  } catch {
-    throw new Error('Invalid address format');
-  }
-  const addrBytes = new Uint8Array(bech32.fromWords(decoded.words));
-
-  let match = false;
-  if (addrBytes.length >= 29) {
-    const addrKeyHash = addrBytes.slice(1, 29);
-    if (bytesToHex(keyHash) === bytesToHex(addrKeyHash)) match = true;
-  }
-  if (!match && addrBytes.length >= 57) {
-    const addrKeyHash = addrBytes.slice(29, 57);
-    if (bytesToHex(keyHash) === bytesToHex(addrKeyHash)) match = true;
-  }
-  if (!match) throw new Error('Public key does not correspond to the provided address');
 }
 
 /* Handler */
@@ -235,7 +193,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    await verifyCIP8({ address, payload, signature, key });
+    await verifyCIP8({ payload, signature, key });
 
     const { data: proposal, error: proposalErr } = await supabase
       .from('proposals')
