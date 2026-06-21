@@ -234,7 +234,31 @@ async function openVoteModal(proposalId) {
     state.currentProposal = proposal;
 
     $('#voteModalTitle').textContent = proposal.title;
-    $('#voteTokenInfo').textContent = `Token: ${shorten(proposal.target_policy_id, 8)} · Snapshot: #${proposal.snapshot_block}`;
+    $('#voteTokenInfo').textContent = `Snapshot: #${proposal.snapshot_block}`;
+
+    const assetId = proposal.target_policy_id + (proposal.target_asset_name || '');
+    const tokenLabel = proposal.target_asset_name
+      ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
+      : shorten(proposal.target_policy_id, 6);
+
+    $('#voteTokenSelector').innerHTML = `
+      <label class="token-option selected" data-token="lovelace">
+        <input type="radio" name="tokenUnit" value="lovelace" checked>
+        <span>ADA</span>
+      </label>
+      <label class="token-option" data-token="${escHtml(assetId)}">
+        <input type="radio" name="tokenUnit" value="${escHtml(assetId)}">
+        <span>${escHtml(tokenLabel)}</span>
+      </label>
+    `;
+
+    $('#voteTokenSelector').querySelectorAll('.token-option').forEach(el => {
+      el.addEventListener('click', () => {
+        $('#voteTokenSelector').querySelectorAll('.token-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        el.querySelector('input').checked = true;
+      });
+    });
 
     const optionsDiv = $('#voteOptions');
     if (proposal.tally && Object.keys(proposal.tally).length > 0) {
@@ -295,6 +319,7 @@ async function submitVote() {
 
     const proposal = state.currentProposal;
     const choice = selected.value;
+    const tokenUnit = document.querySelector('input[name="tokenUnit"]:checked')?.value || 'lovelace';
     const payload = JSON.stringify({
       proposalId: proposal.id,
       choice,
@@ -318,6 +343,7 @@ async function submitVote() {
         key: result.key,
         proposalId: proposal.id,
         choice,
+        tokenUnit,
       }),
     });
 

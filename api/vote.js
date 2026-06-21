@@ -33,7 +33,8 @@ export default async function handler(req, res) {
 
     log(id, 'body', { type: typeof req.body, keys: req.body ? Object.keys(req.body) : [] });
 
-    const { address, payload, signature, key, proposalId, choice } = req.body || {};
+    const { address, payload, signature, key, proposalId, choice, tokenUnit } = req.body || {};
+    const unit = tokenUnit || 'lovelace';
 
     if (!address || !payload || !signature || !key || !proposalId || !choice) {
       return res.status(400).json({
@@ -71,13 +72,16 @@ export default async function handler(req, res) {
     const blockfrostUrl = `https://cardano-${BLOCKFROST_NET}.blockfrost.io/api/v0`;
     const bfHeaders = { project_id: BLOCKFROST_KEY };
 
-    log(id, 'bf-start', { assetId, address: address.slice(0, 12) + '...' });
+    log(id, 'bf-start', { unit, address: address.slice(0, 12) + '...' });
     let totalBalance = 0n;
     let page = 1;
     let hasMore = true;
 
     while (hasMore) {
-      const url = `${blockfrostUrl}/addresses/${address}/utxos/${assetId}?page=${page}&count=100`;
+      const utxoPath = unit === 'lovelace'
+        ? `${address}/utxos`
+        : `${address}/utxos/${unit}`;
+      const url = `${blockfrostUrl}/addresses/${utxoPath}?page=${page}&count=100`;
       log(id, 'bf-fetch', { page, url: url.slice(0, 80) + '...' });
 
       const resp = await fetch(url, { headers: bfHeaders });
@@ -96,11 +100,17 @@ export default async function handler(req, res) {
 
       for (const utxo of utxos) {
         if (utxo.block_height <= proposal.snapshot_block) {
-          const amount = utxo.amount.find(a => a.unit === assetId);
-          if (amount) {
-            const qty = BigInt(amount.quantity);
-            totalBalance += qty;
-            log(id, 'found-utxo', { qty: qty.toString(), block: utxo.block_height });
+          if (unit === 'lovelace') {
+            const adaAmount = utxo.amount.find(a => a.unit === 'lovelace');
+            if (adaAmount) {
+              totalBalance += BigInt(adaAmount.quantity);
+            }
+          } else {
+            const amount = utxo.amount.find(a => a.unit === unit);
+            if (amount) {
+              totalBalance += BigInt(amount.quantity);
+              log(id, 'found-utxo', { qty: amount.quantity, block: utxo.block_height });
+            }
           }
         }
       }
@@ -108,10 +118,10 @@ export default async function handler(req, res) {
       page++;
     }
 
-    log(id, 'balance-done', { total: totalBalance.toString() });
+    log(id, 'balance-done', { total: totalBalance.toString(), unit });
 
     if (totalBalance <= 0n) {
-      return res.status(403).json({ error: 'No token balance held at snapshot block' });
+      return res.status(403).json({ error: `No ${unit === 'lovelace' ? 'ADA' : 'token'} balance held at snapshot block` });
     }
 
     log(id, 'upsert-vote');

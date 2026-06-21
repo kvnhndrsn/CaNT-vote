@@ -162,6 +162,21 @@ header nav { display: flex; align-items: center; gap: 0.75rem; }
 
 .vote-option input[type="radio"] { accent-color: var(--primary); }
 
+.token-selector { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+
+.token-option {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.75rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface2);
+  cursor: pointer; transition: all 0.15s; font-size: 0.8rem;
+}
+
+.token-option:hover { border-color: var(--primary); }
+
+.token-option.selected { border-color: var(--primary); background: var(--primary-dim); }
+
+.token-option input[type="radio"] { accent-color: var(--primary); }
+
 .wallet-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
 
 .wallet-btn {
