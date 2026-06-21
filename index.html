@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNT Vote — Cardano Native Token Voting</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%234a8cff'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-weight='bold'>V</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>CNT</span> Vote</div>
+  <nav>
+    <button class="btn btn-sm" id="createBtn" style="display:none">+ Propose</button>
+    <div id="walletArea">
+      <button class="btn btn-sm btn-primary" id="connectBtn">Connect Wallet</button>
+    </div>
+  </nav>
+</header>
+
+<main class="container">
+  <div id="mainView">
+    <div class="section-title">
+      Active Proposals
+      <span class="badge" id="proposalCount">0</span>
+    </div>
+    <div id="proposalList"></div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="walletModal">
+  <div class="modal">
+    <button class="btn btn-sm btn-ghost modal-close" data-close="walletModal">&times;</button>
+    <h2>Connect Wallet</h2>
+    <div class="wallet-list" id="walletList"></div>
+    <p class="tooltip">Make sure your Cardano wallet extension is installed and unlocked.</p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <button class="btn btn-sm btn-ghost modal-close" data-close="createModal">&times;</button>
+    <h2>Create Proposal</h2>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="propTitle" placeholder="e.g. Fund the Catalyst proposal">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="propDesc" placeholder="Describe your proposal..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Token Policy ID</label>
+      <input type="text" id="propPolicy" placeholder="64-char hex policy ID">
+    </div>
+    <div class="form-group">
+      <label>Asset Name (hex, optional for ADA)</label>
+      <input type="text" id="propAsset" placeholder="Leave empty for default policy token">
+    </div>
+    <div class="form-group">
+      <label>Snapshot Block Height</label>
+      <input type="number" id="propBlock" placeholder="e.g. 12345678">
+      <p class="tooltip" style="margin-top:0.25rem">Block height to snapshot token holdings. Leave empty for latest.</p>
+    </div>
+    <button class="btn btn-primary" id="createSubmitBtn" style="width:100%">Create Proposal</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="voteModal">
+  <div class="modal">
+    <button class="btn btn-sm btn-ghost modal-close" data-close="voteModal">&times;</button>
+    <h2 id="voteModalTitle">Cast Your Vote</h2>
+    <p class="tooltip" id="voteTokenInfo" style="margin-bottom:0.75rem"></p>
+    <div class="vote-options" id="voteOptions"></div>
+    <button class="btn btn-primary" id="voteSubmitBtn" style="width:100%">Sign & Submit Vote</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="auditModal">
+  <div class="modal" style="max-width:640px">
+    <button class="btn btn-sm btn-ghost modal-close" data-close="auditModal">&times;</button>
+    <h2>Audit Trail</h2>
+    <p class="tooltip" id="auditInfo" style="margin-bottom:0.75rem"></p>
+    <div class="table-wrap" id="auditTableWrap"></div>
+    <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+      <button class="btn btn-sm" id="copyAuditBtn">Copy JSON</button>
+      <a class="btn btn-sm" id="downloadAuditBtn" target="_blank">Download</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "bech32": "https://esm.sh/bech32@2.0.0"
+  }
+}
+</script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
