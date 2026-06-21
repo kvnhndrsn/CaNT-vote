@@ -14,6 +14,44 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      if (req.query.id) {
+        const { data: proposal, error: propErr } = await supabase
+          .from('proposals')
+          .select('*')
+          .eq('id', req.query.id)
+          .single();
+
+        if (propErr || !proposal) {
+          return res.status(404).json({ error: 'Proposal not found' });
+        }
+
+        const { data: votes, error: votesErr } = await supabase
+          .from('votes')
+          .select('voter_address, vote_choice, stake_weight, created_at')
+          .eq('proposal_id', req.query.id);
+
+        if (votesErr) throw votesErr;
+
+        const tally = {};
+        let totalWeight = 0n;
+        for (const v of votes) {
+          tally[v.vote_choice] = (tally[v.vote_choice] || 0n) + BigInt(v.stake_weight);
+          totalWeight += BigInt(v.stake_weight);
+        }
+
+        const formattedTally = {};
+        for (const [choice, weight] of Object.entries(tally)) {
+          formattedTally[choice] = weight.toString();
+        }
+
+        return res.json({
+          ...proposal,
+          voterCount: votes.length,
+          totalWeight: totalWeight.toString(),
+          tally: formattedTally,
+        });
+      }
+
       const { data, error } = await supabase
         .from('proposals')
         .select('*')

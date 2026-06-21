@@ -228,7 +228,7 @@ async function openVoteModal(proposalId) {
   }
 
   try {
-    const res = await fetch(`/api/proposals/${proposalId}`);
+    const res = await fetch(`/api/proposals?id=${proposalId}`);
     if (!res.ok) throw new Error('Proposal not found');
     const proposal = await res.json();
     state.currentProposal = proposal;
