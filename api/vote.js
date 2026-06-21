@@ -147,6 +147,10 @@ export default async function handler(req, res) {
         if (!resp.ok) {
           const text = await resp.text().catch(() => '');
           log(id, 'bf-err-body', { text: text.slice(0, 200) });
+          if (resp.status === 404) {
+            log(id, 'bf-skip-404', { addr: addr.slice(0, 12) });
+            break;
+          }
           bfErrors.push({ addr: addr.slice(0, 12), page, status: resp.status, detail: text.slice(0, 100) });
           break;
         }
@@ -185,6 +189,25 @@ export default async function handler(req, res) {
     }
 
     log(id, 'balance-done', { total: totalBalance.toString(), unit, addrCount: addrsToCheck.length });
+
+    // If all UTXO queries returned 404 (addresses not on-chain yet), fall back to current balance
+    if (totalBalance <= 0n && bfErrors.length === 0 && addrsToCheck.length > 0) {
+      log(id, 'bf-fallback-404', { msg: 'All addresses returned 404 from UTXO endpoint, trying /addresses/{addr} fallback' });
+      for (const addr of addrsToCheck) {
+        try {
+          const sResp = await fetch(`${blockfrostUrl}/addresses/${addr}`, { headers: bfHeaders });
+          if (sResp.ok) {
+            const info = await sResp.json();
+            const bal = BigInt(info.controlled_amount || info.total_balance || '0');
+            if (bal > 0n) {
+              totalBalance += bal;
+              log(id, 'bf-fallback-found', { addr: addr.slice(0, 12), balance: bal.toString() });
+            }
+          }
+        } catch {}
+      }
+      log(id, 'bf-fallback-done', { total: totalBalance.toString() });
+    }
 
     if (totalBalance > 0n) {
       log(id, 'upsert-vote');

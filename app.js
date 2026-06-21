@@ -289,9 +289,11 @@ function hexToBech32(hex) {
   if (!pairs) throw new Error('Invalid hex address');
   const bytes = new Uint8Array(pairs.map(b => parseInt(b, 16)));
   const header = bytes[0];
-  const addrType = (header >> 4) & 0x0f;
-  const isStake = addrType >= 14;
-  const prefix = isStake ? 'stake' : 'addr';
+  const typeBits = (header >> 4) & 0x07;
+  const networkBit = header & 0x01;
+  const isStake = typeBits >= 6;
+  const basePrefix = isStake ? 'stake' : 'addr';
+  const prefix = networkBit ? basePrefix : basePrefix + '_test';
   return bech32.encode(prefix, bech32.toWords(bytes), 200);
 }
 
