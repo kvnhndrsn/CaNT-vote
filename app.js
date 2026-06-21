@@ -1,8 +1,6 @@
 import { bech32 } from 'bech32';
 
 console.log('[app] module loaded');
-console.log('[app] wallet button:', $('#connectBtn'));
-console.log('[app] vote button:', $('#voteSubmitBtn'));
 
 const KNOWN_WALLETS = [
   { id: 'eternl', name: 'Eternl', icon: 'E' },
