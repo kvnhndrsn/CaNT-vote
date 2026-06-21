@@ -18,6 +18,7 @@ const state = {
   api: null,
   address: null,
   addresses: [],
+  stakeAddresses: [],
   hexAddress: null,
   proposals: [],
   currentProposal: null,
@@ -257,18 +258,24 @@ async function connectWallet(walletId) {
 
     const api = await ext.enable();
     const usedAddrs = await api.getUsedAddresses();
+    let allHex = [...usedAddrs];
+    try {
+      const unusedAddrs = await api.getUnusedAddresses();
+      if (Array.isArray(unusedAddrs)) allHex = [...usedAddrs, ...unusedAddrs];
+    } catch {}
+    if (allHex.length === 0) throw new Error('No address returned by wallet');
+
     const rewardAddrs = await api.getRewardAddresses();
-    const allHex = usedAddrs.length > 0 ? usedAddrs : rewardAddrs;
-    if (allHex.length === 0) throw new Error('No address returned');
 
     state.wallet = walletId;
     state.api = api;
     state.addresses = allHex.map(h => hexToBech32(h));
     state.address = state.addresses[0];
     state.hexAddress = allHex[0];
+    state.stakeAddresses = rewardAddrs.map(h => hexToBech32(h));
 
     updateWalletUI();
-    toast('Connected: ' + shorten(addr, 8), 'success');
+    toast('Connected: ' + shorten(state.address, 8), 'success');
     $('#walletModal').classList.remove('open');
   } catch (e) {
     console.error(e);
@@ -282,7 +289,7 @@ function hexToBech32(hex) {
   if (!pairs) throw new Error('Invalid hex address');
   const bytes = new Uint8Array(pairs.map(b => parseInt(b, 16)));
   const header = bytes[0];
-  const addrType = header & 0x0f;
+  const addrType = (header >> 4) & 0x0f;
   const isStake = addrType >= 14;
   const prefix = isStake ? 'stake' : 'addr';
   return bech32.encode(prefix, bech32.toWords(bytes), 200);
@@ -309,6 +316,7 @@ function disconnectWallet() {
   state.api = null;
   state.address = null;
   state.addresses = [];
+  state.stakeAddresses = [];
   state.hexAddress = null;
   updateWalletUI();
   toast('Disconnected');
@@ -391,12 +399,12 @@ async function openVoteModal(proposalId) {
       `;
     } else {
       $('#voteTokenSelector').innerHTML = `
-        <label class="token-option selected">
-          <input type="radio" name="tokenUnit" value="lovelace" checked>
+        <label class="token-option">
+          <input type="radio" name="tokenUnit" value="lovelace">
           <span>ADA</span>
         </label>
-        <label class="token-option">
-          <input type="radio" name="tokenUnit" value="${escHtml(assetId)}">
+        <label class="token-option selected">
+          <input type="radio" name="tokenUnit" value="${escHtml(assetId)}" checked>
           <span>${escHtml(tokenLabel)}</span>
         </label>
       `;
@@ -460,6 +468,7 @@ async function submitVote() {
       body: JSON.stringify({
         address: state.address,
         addresses: state.addresses,
+        stakeAddresses: state.stakeAddresses,
         payload,
         signature: result.signature,
         key: result.key,
