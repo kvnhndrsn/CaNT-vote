@@ -24,25 +24,37 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { title, description, targetPolicyId, targetAssetName, snapshotBlock, creatorAddress } = req.body;
+      let { title, description, targetPolicyId, targetAssetName, snapshotBlock, creatorAddress } = req.body;
 
-      if (!title || !description || !targetPolicyId || !snapshotBlock || !creatorAddress) {
+      if (!title || !description || !targetPolicyId || !creatorAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
       const blockfrostUrl = `https://cardano-${process.env.BLOCKFROST_NETWORK || 'mainnet'}.blockfrost.io/api/v0`;
+      const blockfrostHeaders = { project_id: process.env.BLOCKFROST_API_KEY || '' };
 
       let snapshotSlot = 0;
-      try {
-        const tipResp = await fetch(`${blockfrostUrl}/blocks/${snapshotBlock}`, {
-          headers: { project_id: process.env.BLOCKFROST_API_KEY },
-        });
-        if (tipResp.ok) {
-          const block = await tipResp.json();
-          snapshotSlot = block.slot || 0;
+      if (!snapshotBlock) {
+        try {
+          const tipResp = await fetch(`${blockfrostUrl}/blocks/latest`, { headers: blockfrostHeaders });
+          if (tipResp.ok) {
+            const tip = await tipResp.json();
+            snapshotBlock = tip.height || tip.block;
+            snapshotSlot = tip.slot || 0;
+          }
+        } catch {
+          return res.status(500).json({ error: 'Could not fetch latest block. Provide a snapshot block or set BLOCKFROST_API_KEY.' });
         }
-      } catch {
-        // non-critical, slot is optional
+      } else {
+        try {
+          const tipResp = await fetch(`${blockfrostUrl}/blocks/${snapshotBlock}`, { headers: blockfrostHeaders });
+          if (tipResp.ok) {
+            const block = await tipResp.json();
+            snapshotSlot = block.slot || 0;
+          }
+        } catch {
+          // non-critical
+        }
       }
 
       const { data, error } = await supabase

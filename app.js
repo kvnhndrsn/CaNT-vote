@@ -406,21 +406,7 @@ async function createProposal() {
   btn.textContent = 'Creating...';
 
   try {
-    let snapshotBlock = blockInput ? parseInt(blockInput) : null;
-
-    if (!snapshotBlock) {
-      const tipRes = await fetch('https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest', {
-        headers: {
-          project_id: 'previewXXX',
-        },
-      });
-      if (tipRes.ok) {
-        const tip = await tipRes.json();
-        snapshotBlock = tip.height || tip.block;
-      } else {
-        snapshotBlock = 0;
-      }
-    }
+    const snapshotBlock = blockInput ? parseInt(blockInput) : null;
 
     const payload = JSON.stringify({
       title, description, policy, asset, snapshotBlock, timestamp: Date.now(),
