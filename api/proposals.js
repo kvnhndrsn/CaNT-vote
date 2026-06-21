@@ -8,6 +8,10 @@ const supabase = createClient(
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    return res.status(500).json({ error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY env vars.' });
+  }
+
   try {
     if (req.method === 'GET') {
       const { data, error } = await supabase

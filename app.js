@@ -48,13 +48,16 @@ function formatWeight(w) {
 async function fetchProposals() {
   try {
     const res = await fetch('/api/proposals');
-    if (!res.ok) throw new Error('Failed to fetch');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Server error (${res.status})`);
+    }
     state.proposals = await res.json();
     renderProposals();
   } catch (e) {
     console.error(e);
     $('#proposalList').innerHTML =
-      '<div class="empty-state"><strong>Could not load proposals</strong><p>Make sure the API is running.</p></div>';
+      '<div class="empty-state"><strong>Could not load proposals</strong><p>' + escHtml(e.message) + '</p></div>';
   }
 }
 
@@ -178,12 +181,15 @@ async function connectWallet(walletId) {
 }
 
 function hexToBech32(hex) {
-  const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+  if (!hex || hex.length < 2) throw new Error('Invalid hex address');
+  const pairs = hex.match(/.{1,2}/g);
+  if (!pairs) throw new Error('Invalid hex address');
+  const bytes = new Uint8Array(pairs.map(b => parseInt(b, 16)));
   const header = bytes[0];
   const addrType = header & 0x0f;
   const isStake = addrType >= 14;
   const prefix = isStake ? 'stake' : 'addr';
-  return bech32.encode(prefix, bech32.toWords(bytes));
+  return bech32.encode(prefix, bech32.toWords(bytes), 200);
 }
 
 function updateWalletUI() {
