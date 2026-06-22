@@ -90,6 +90,7 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
   transition: border-color 0.15s;
 }
 
+.proposal-card { cursor: pointer; }
 .proposal-card:hover { border-color: var(--text3); }
 
 .proposal-card h3 {
@@ -107,7 +108,12 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 .proposal-card .desc {
   font-size: 0.78rem; color: var(--text3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin-top: 0.15rem;
+  margin-top: 0.15rem; cursor: pointer;
+}
+
+.proposal-card.expanded .desc {
+  white-space: normal; overflow: visible; text-overflow: clip;
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
 }
 
 .empty-state {
@@ -176,6 +182,8 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
   cursor: pointer; transition: all 0.15s; font-size: 0.75rem;
 }
 
+.token-option .token-logo { width: 16px; height: 16px; }
+
 .token-option:hover { border-color: var(--primary); }
 
 .token-option.selected { border-color: var(--primary); background: var(--primary-dim); }
@@ -194,12 +202,7 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 
 .wallet-btn:hover { border-color: var(--primary); background: var(--primary-dim); }
 
-.wallet-btn .dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--success); flex-shrink: 0;
-}
-
-.wallet-btn .dot.disabled { background: var(--text3); }
+.wallet-logo { width: 24px; height: 24px; flex-shrink: 0; }
 
 .tooltip { font-size: 0.72rem; color: var(--text3); }
 

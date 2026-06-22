@@ -2,18 +2,30 @@ import { bech32 } from 'bech32';
 
 console.log('[app] module loaded');
 
+const WALLET_LOGOS = {
+  eternl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b6bf5"/><rect x="10" y="9" width="5" height="14" rx="1" fill="white" opacity=".9"/><rect x="17" y="9" width="5" height="14" rx="1" fill="white" opacity=".6"/></svg>'),
+  nami: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><path d="M10 16c3-4 6-5 8-3s3 4 4 3-2-5-5-7-5 0-7 7z" fill="white" opacity=".85"/></svg>'),
+  lace: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ff6b35"/><path d="M16 8c-2 4-6 6-6 11 0 3 2 5 6 5s6-2 6-5c0-5-4-7-6-11z" fill="white" opacity=".85"/><circle cx="16" cy="16" r="3" fill="white" opacity=".95"/></svg>'),
+  flint: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#00b4d8"/><path d="M16 7l3 6 6 1-5 5 1 7-6-4-6 4 1-7-5-5 6-1z" fill="white" opacity=".8"/></svg>'),
+  gerowallet: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#7c3aed"/><circle cx="16" cy="14" r="4" fill="white" opacity=".9"/><ellipse cx="16" cy="22" rx="5" ry="3" fill="white" opacity=".7"/></svg>'),
+  typhoncip30: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#10b981"/><path d="M12 10h8l-2 6h3l-5 10 2-8h-4z" fill="white" opacity=".9"/></svg>'),
+  vespr: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f43f5e"/><path d="M16 8v16M8 16h16" stroke="white" stroke-width="3" stroke-linecap="round" opacity=".85"/></svg>'),
+  begin: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M12 22V10l4 8 4-8v12" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>'),
+};
+
 const KNOWN_WALLETS = [
-  { id: 'eternl', name: 'Eternl', icon: 'E' },
-  { id: 'nami', name: 'Nami', icon: 'N' },
-  { id: 'lace', name: 'Lace', icon: 'L' },
-  { id: 'flint', name: 'Flint', icon: 'F' },
-  { id: 'gerowallet', name: 'Gero', icon: 'G' },
-  { id: 'typhoncip30', name: 'Typhon', icon: 'T' },
-  { id: 'vespr', name: 'Vespr', icon: 'V' },
-  { id: 'begin', name: 'Begin', icon: 'B' },
+  { id: 'eternl', name: 'Eternl' },
+  { id: 'nami', name: 'Nami' },
+  { id: 'lace', name: 'Lace' },
+  { id: 'flint', name: 'Flint' },
+  { id: 'gerowallet', name: 'Gero' },
+  { id: 'typhoncip30', name: 'Typhon' },
+  { id: 'vespr', name: 'Vespr' },
+  { id: 'begin', name: 'Begin' },
 ];
 
 const TOKEN_LOGOS = {
+  ADA: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#4a8cff"/><text x="16" y="22" font-size="17" text-anchor="middle" fill="white" font-weight="bold">ADA</text></svg>'),
   SNEK: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#22c55e"/><path d="M10 20c2-4 4-6 6-6s4 3 6 3-2 4-4 4-6-2-8-1z" fill="white" opacity=".9"/><circle cx="12" cy="13" r="1.5" fill="white"/><circle cx="20" cy="13" r="1.5" fill="white"/></svg>'),
   NIGHT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M20 8c-5 0-9 4-9 9s4 9 9 9c-3 0-6-3-6-6s3-6 6-6z" fill="white" opacity=".9"/><circle cx="23" cy="11" r="1.2" fill="white" opacity=".7"/><circle cx="25" cy="16" r=".8" fill="white" opacity=".5"/></svg>'),
   WMTX: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b82f6"/><circle cx="16" cy="16" r="6" fill="none" stroke="white" stroke-width="1.5" opacity=".9"/><path d="M10 10l3 3M22 10l-3 3M10 22l3-3M22 22l-3-3" stroke="white" stroke-width="1.5" opacity=".6"/><circle cx="16" cy="10" r="1" fill="white"/><circle cx="16" cy="22" r="1" fill="white"/><circle cx="10" cy="16" r="1" fill="white"/><circle cx="22" cy="16" r="1" fill="white"/></svg>'),
@@ -180,14 +192,24 @@ function renderProposals() {
     const choices = Object.entries(summary);
     const isCreator = state.address && p.creator_address === state.address;
 
+    function supplyPct(totalStr, supplyStr) {
+      const t = Number(totalStr), s = Number(supplyStr);
+      if (!s || s <= 0) return '';
+      return ((t / s) * 100).toFixed(2) + '%';
+    }
+
     let tallyHtml = '';
     if (choices.length > 0) {
+      const supply = p.circulatingSupply
+        ? BigInt(p.circulatingSupply)
+        : isADA ? 45_000_000_000_000_000n : null;
+      const pct = supply ? supplyPct(total.toString(), supply.toString()) : null;
       tallyHtml = `
         <div class="card-tally">
           <div class="card-tally-row">
             ${pieSvg(choices, total.toString())}
             <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${pctStr(w, total.toString())}`).join(' · ')}</span>
-            <span class="card-tally-pct">${formatWeight(total.toString())}</span>
+            <span class="card-tally-pct">${formatWeight(total.toString())}${pct ? ` · ${pct}` : ''}</span>
           </div>
         </div>
       `;
@@ -222,12 +244,27 @@ function renderProposals() {
               <span>by ${shorten(p.creator_address, 6)}</span>
             </div>
             <div class="desc">${escHtml(p.description)}</div>
+            <div class="extra" style="display:none">
+              <div class="meta" style="margin-top:0.3rem">
+                <span>Created ${new Date(p.created_at).toLocaleString()}</span>
+                <span>${shorten(p.creator_address, 20)}</span>
+              </div>
+            </div>
             ${tallyHtml}
           </div>
         </div>
       </div>
     `;
   }).join('');
+
+  list.querySelectorAll('.proposal-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-actions') || e.target.closest('button')) return;
+      card.classList.toggle('expanded');
+      const extra = card.querySelector('.extra');
+      if (extra) extra.style.display = card.classList.contains('expanded') ? '' : 'none';
+    });
+  });
 
   list.querySelectorAll('.vote-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -281,8 +318,9 @@ function updateCountdowns() {
   });
 }
 
-function tokenLogo(policyId) {
-  if (!policyId) return null;
+function tokenLogo(policyId, label) {
+  if (!policyId) return TOKEN_LOGOS.ADA;
+  if (label && TOKEN_LOGOS[label]) return TOKEN_LOGOS[label];
   const t = CURATED_TOKENS.find(t => t.policy === policyId);
   return t ? t.logo : null;
 }
@@ -317,7 +355,7 @@ function openWalletModal() {
   } else {
     list.innerHTML = available.map(w => `
       <button class="wallet-btn" data-wallet="${w.id}">
-        <span class="dot"></span>
+        <img class="wallet-logo" src="${WALLET_LOGOS[w.id] || ''}" alt="">
         ${w.name}
       </button>
     `).join('');
@@ -427,10 +465,13 @@ async function openVoteModal(proposalId) {
       ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
       : shorten(proposal.target_policy_id, 6)));
 
-    const supplyInfo = proposal.circulatingSupply
-      ? `Circulating: ${formatWeight(proposal.circulatingSupply)}`
+    const totalAdaSupply = 45_000_000_000_000_000n;
+    const supply = isADA
+      ? totalAdaSupply
+      : (proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null);
+    const supplyInfo = supply
+      ? `Supply: ${formatWeight(supply.toString())}`
       : '';
-
     const localLogo = tokenLogo(proposal.target_policy_id);
     const imgSrc = proposal.tokenImage || localLogo;
     const imgHtml = imgSrc
@@ -443,29 +484,26 @@ async function openVoteModal(proposalId) {
     `;
 
     const optionsDiv = $('#voteOptions');
-    if (proposal.tally && Object.keys(proposal.tally).length > 0) {
-      const total = BigInt(proposal.totalWeight || 0);
-      const supply = proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null;
-      optionsDiv.innerHTML = Object.entries(proposal.tally).map(([choice, weight]) => {
-        const pct = total > 0n ? pctNum(weight, proposal.totalWeight) : 0;
-        const supplyPct = supply && supply > 0n
-          ? ' (' + (Number(BigInt(weight)) / Number(supply) * 100).toFixed(2) + '% of supply)'
-          : '';
-        return `
-          <label class="vote-option" data-choice="${escHtml(choice)}">
-            <input type="radio" name="voteChoice" value="${escHtml(choice)}">
-            <span>${escHtml(choice)}: ${formatWeight(weight)} (${pct.toFixed(1)}%)${supplyPct}</span>
-          </label>
-        `;
-      }).join('');
-    } else {
-      optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => `
-        <label class="vote-option" data-choice="${c}">
-          <input type="radio" name="voteChoice" value="${c}">
-          <span>${c}</span>
+    const tally = proposal.tally || {};
+    const tallyTotal = BigInt(proposal.totalWeight || 0);
+    const supply = isADA ? totalAdaSupply : (proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null);
+
+    optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
+      const weight = tally[c];
+      const pct = weight && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
+      const supplyPct = weight && supply && supply > 0n
+        ? ' (' + (Number(BigInt(weight)) / Number(supply) * 100).toFixed(2) + '% of supply)'
+        : '';
+      const label = weight
+        ? `${escHtml(c)}: ${formatWeight(weight)} (${pct.toFixed(1)}%)${supplyPct}`
+        : escHtml(c);
+      return `
+        <label class="vote-option" data-choice="${escHtml(c)}">
+          <input type="radio" name="voteChoice" value="${escHtml(c)}">
+          <span>${label}</span>
         </label>
-      `).join('');
-    }
+      `;
+    }).join('');
 
     optionsDiv.querySelectorAll('.vote-option').forEach(el => {
       el.addEventListener('click', () => {
@@ -643,48 +681,63 @@ async function openAuditModal(proposalId) {
 
 /* ---------- Create Proposal ---------- */
 
+const TOKEN_SELECT_ITEMS = [
+  { label: 'ADA', value: '', logo: TOKEN_LOGOS.ADA },
+  ...CURATED_TOKENS.map(t => ({ label: t.label, value: t.label, logo: t.logo })),
+  { label: 'Custom', value: 'custom', logo: null },
+];
+
+function populateTokenSelector() {
+  const c = $('#propTokenSelector');
+  c.innerHTML = TOKEN_SELECT_ITEMS.map(t => `
+    <label class="token-option" data-value="${t.value}">
+      <input type="radio" name="propToken" value="${t.value}">
+      ${t.logo ? `<img class="token-logo" src="${t.logo}" alt="">` : ''}
+      <span>${t.label}</span>
+    </label>
+  `).join('');
+  c.querySelectorAll('.token-option').forEach(el => {
+    el.addEventListener('click', () => {
+      c.querySelectorAll('.token-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      el.querySelector('input').checked = true;
+      const val = el.dataset.value;
+      if (!val) {
+        $('#propCustomGroup').style.display = 'none';
+        $('#propAssetGroup').style.display = 'none';
+        $('#propPolicy').value = '';
+        $('#propAsset').value = '';
+      } else if (val === 'custom') {
+        $('#propCustomGroup').style.display = '';
+        $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+        $('#propPolicy').value = '';
+        $('#propAsset').value = '';
+      } else {
+        const token = CURATED_TOKENS.find(t => t.label === val);
+        if (token) {
+          $('#propCustomGroup').style.display = '';
+          $('#propAssetGroup').style.display = token.asset ? '' : 'none';
+          $('#propPolicy').value = token.policy;
+          $('#propAsset').value = token.asset || '';
+        }
+      }
+    });
+  });
+}
+
 $('#createBtn').addEventListener('click', () => {
   if (!state.api) { toast('Connect wallet first', 'error'); return; }
-
-  const sel = $('#propTokenSelect');
-  sel.innerHTML = '<option value="">ADA</option>' +
-    CURATED_TOKENS.map(t => `<option value="${t.label}">${t.label}</option>`).join('') +
-    '<option value="custom">— Custom token —</option>';
-  sel.value = '';
+  populateTokenSelector();
   $('#propCustomGroup').style.display = 'none';
   $('#propAssetGroup').style.display = 'none';
   $('#propPolicy').value = '';
   $('#propAsset').value = '';
-
   $('#createModal').classList.add('open');
 });
 
-$('#propTokenSelect').addEventListener('change', () => {
-  const val = $('#propTokenSelect').value;
-  if (!val) {
-    $('#propCustomGroup').style.display = 'none';
-    $('#propAssetGroup').style.display = 'none';
-    $('#propPolicy').value = '';
-    $('#propAsset').value = '';
-  } else if (val === 'custom') {
-    $('#propCustomGroup').style.display = '';
-    $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
-    $('#propPolicy').value = '';
-    $('#propAsset').value = '';
-  } else {
-    const token = CURATED_TOKENS.find(t => t.label === val);
-    if (token) {
-      $('#propCustomGroup').style.display = '';
-      $('#propAssetGroup').style.display = token.asset ? '' : 'none';
-      $('#propPolicy').value = token.policy;
-      $('#propAsset').value = token.asset || '';
-    }
-  }
-});
-
 $('#propPolicy').addEventListener('input', () => {
-  const val = $('#propTokenSelect').value;
-  if (val === 'custom') {
+  const sel = $('#propTokenSelector').querySelector('.token-option.selected');
+  if (sel && sel.dataset.value === 'custom') {
     $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
   }
 });
@@ -694,12 +747,18 @@ $('#createSubmitBtn').addEventListener('click', createProposal);
 async function createProposal() {
   const title = $('#propTitle').value.trim();
   const description = $('#propDesc').value.trim();
-  const tokenVal = $('#propTokenSelect').value;
+  const selected = $('#propTokenSelector').querySelector('.token-option.selected');
+  const tokenVal = selected ? selected.dataset.value : '';
   const policy = $('#propPolicy').value.trim();
   const asset = $('#propAsset').value.trim();
 
   if (!title || !description) {
     toast('Fill in title and description', 'error');
+    return;
+  }
+
+  if (tokenVal === 'custom' && !policy) {
+    toast('Enter a policy ID for custom token', 'error');
     return;
   }
 
@@ -729,7 +788,6 @@ async function createProposal() {
     $('#createModal').classList.remove('open');
     $('#propTitle').value = '';
     $('#propDesc').value = '';
-    $('#propTokenSelect').value = '';
     $('#propPolicy').value = '';
     $('#propAsset').value = '';
     $('#propCustomGroup').style.display = 'none';
