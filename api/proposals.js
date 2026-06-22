@@ -88,34 +88,65 @@ function extractAssetMeta(metadata) {
   return { name: null, image: null };
 }
 
+async function fetchTokenRegistry(assetPolicy, assetName) {
+  const id = 'reg-' + reqId();
+  if (!assetPolicy || !assetName) return null;
+  const subject = (assetPolicy + assetName).toLowerCase();
+  try {
+    log(id, 'fetch', { subject: subject.slice(0, 24) + '...' });
+    const resp = await fetch(`https://tokens.cardano.org/metadata/${subject}`);
+    if (!resp.ok) {
+      log(id, 'not-found', { status: resp.status });
+      return null;
+    }
+    const data = await resp.json();
+    log(id, 'got', { name: data.name?.value, hasLogo: !!data.logo?.value });
+    const image = data.logo?.value
+      ? `data:image/png;base64,${data.logo.value}`
+      : null;
+    return { name: data.name?.value || null, image };
+  } catch (e) {
+    log(id, 'error', { msg: e.message });
+    return null;
+  }
+}
+
 async function fetchAssetInfo(assetPolicy, assetName) {
   const id = 'asset-' + reqId();
   if (!assetPolicy) return null;
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
+  let supply = null;
+  let name = null;
+  let image = null;
   try {
     log(id, 'fetch', { policy: assetPolicy.slice(0, 16) + '...', name: assetName || '(empty)' });
     const result = await koiosPost(`${koiosUrl}/asset_info`, {
       _asset_policy: assetPolicy,
       _asset_name: assetName || '',
     });
-    if (!Array.isArray(result) || result.length === 0) {
+    if (Array.isArray(result) && result.length > 0) {
+      const info = result[0];
+      log(id, 'got-info', { supply: info.total_supply, hasMeta: !!info.minting_tx_metadata });
+      supply = info.total_supply;
+      const meta = extractAssetMeta(info.minting_tx_metadata);
+      name = meta.name;
+      image = meta.image;
+    } else {
       log(id, 'no-result', { result });
-      return null;
     }
-    const info = result[0];
-    log(id, 'got-info', { supply: info.total_supply, hasMeta: !!info.minting_tx_metadata });
-    const { name, image } = extractAssetMeta(info.minting_tx_metadata);
-    log(id, 'extracted', { name, image });
-    return {
-      supply: info.total_supply,
-      name,
-      image,
-    };
   } catch (e) {
     log(id, 'error', { msg: e.message });
-    return null;
   }
+  if (!name && !image && assetName) {
+    log(id, 'fallback-registry', {});
+    const reg = await fetchTokenRegistry(assetPolicy, assetName);
+    if (reg) {
+      if (!name) name = reg.name;
+      if (!image) image = reg.image;
+    }
+  }
+  return { supply, name, image };
 }
 
 async function fetchLatestBlock() {
@@ -162,13 +193,17 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
       }
     }
     if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
-      const result = await koiosPost(`${koiosUrl}/address_info`, { _addresses: addresses });
-      if (Array.isArray(result)) {
-        const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', bal: a.balance }));
-        log(id, 'ada-addr', { count: result.length, balances });
-        for (const entry of result) totalBalance += BigInt(entry.balance || '0');
-      } else {
-        log(id, 'ada-addr-null', { result });
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+        const batch = addresses.slice(i, i + BATCH_SIZE);
+        const result = await koiosPost(`${koiosUrl}/address_info`, { _addresses: batch });
+        if (Array.isArray(result)) {
+          const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', bal: a.balance }));
+          log(id, 'ada-addr-batch', { batchIdx: i / BATCH_SIZE, count: result.length, balances });
+          for (const entry of result) totalBalance += BigInt(entry.balance || '0');
+        } else {
+          log(id, 'ada-addr-batch-null', { batchIdx: i / BATCH_SIZE, result });
+        }
       }
     }
   } else {

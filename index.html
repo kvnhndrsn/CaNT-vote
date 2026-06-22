@@ -52,8 +52,15 @@
       <textarea id="propDesc" placeholder="Describe your proposal..."></textarea>
     </div>
     <div class="form-group">
-      <label>Token Policy ID <span class="tooltip">(optional, leave empty for ADA)</span></label>
-      <input type="text" id="propPolicy" placeholder="64-char hex policy ID — empty = ADA">
+      <label>Token <span class="tooltip">(select a curated token or choose Custom)</span></label>
+      <select id="propTokenSelect">
+        <option value="">ADA</option>
+        <option value="custom">— Custom token —</option>
+      </select>
+    </div>
+    <div class="form-group" id="propCustomGroup" style="display:none">
+      <label>Policy ID <span class="tooltip">(64-char hex)</span></label>
+      <input type="text" id="propPolicy" placeholder="64-char hex policy ID">
     </div>
     <div class="form-group" id="propAssetGroup" style="display:none">
       <label>Asset Name (hex)</label>

@@ -13,6 +13,24 @@ const KNOWN_WALLETS = [
   { id: 'begin', name: 'Begin', icon: 'B' },
 ];
 
+const TOKEN_LOGOS = {
+  SNEK: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#22c55e"/><path d="M10 20c2-4 4-6 6-6s4 3 6 3-2 4-4 4-6-2-8-1z" fill="white" opacity=".9"/><circle cx="12" cy="13" r="1.5" fill="white"/><circle cx="20" cy="13" r="1.5" fill="white"/></svg>'),
+  NIGHT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M20 8c-5 0-9 4-9 9s4 9 9 9c-3 0-6-3-6-6s3-6 6-6z" fill="white" opacity=".9"/><circle cx="23" cy="11" r="1.2" fill="white" opacity=".7"/><circle cx="25" cy="16" r=".8" fill="white" opacity=".5"/></svg>'),
+  WMTX: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b82f6"/><circle cx="16" cy="16" r="6" fill="none" stroke="white" stroke-width="1.5" opacity=".9"/><path d="M10 10l3 3M22 10l-3 3M10 22l3-3M22 22l-3-3" stroke="white" stroke-width="1.5" opacity=".6"/><circle cx="16" cy="10" r="1" fill="white"/><circle cx="16" cy="22" r="1" fill="white"/><circle cx="10" cy="16" r="1" fill="white"/><circle cx="22" cy="16" r="1" fill="white"/></svg>'),
+  MIN: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f59e0b"/><path d="M11 21l5-10 5 10" fill="none" stroke="white" stroke-width="1.8" stroke-linejoin="round" opacity=".9"/><path d="M13 18h6" stroke="white" stroke-width="1.5" opacity=".7"/></svg>'),
+  STRIKE: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ef4444"/><path d="M18 6l-6 12h4l-2 8 8-14h-4z" fill="white" opacity=".9"/></svg>'),
+  SUNDAE: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ec4899"/><ellipse cx="16" cy="19" rx="7" ry="4" fill="white" opacity=".9"/><circle cx="13" cy="11" r="2.5" fill="white" opacity=".7"/><circle cx="16" cy="9" r="2" fill="white" opacity=".5"/><circle cx="19" cy="12" r="1.8" fill="white" opacity=".6"/></svg>'),
+};
+
+const CURATED_TOKENS = [
+  { label: 'SNEK', policy: '279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f', asset: '534e454b', logo: TOKEN_LOGOS.SNEK },
+  { label: 'NIGHT', policy: '0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa', asset: '4e49474854', logo: TOKEN_LOGOS.NIGHT },
+  { label: 'WMTX', policy: 'e5a42a1a1d3d1da71b0449663c32798725888d2eb0843c4dabeca05a', asset: '576f726c644d6f62696c65546f6b656e58', logo: TOKEN_LOGOS.WMTX },
+  { label: 'MIN', policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', logo: TOKEN_LOGOS.MIN },
+  { label: 'STRIKE', policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', logo: TOKEN_LOGOS.STRIKE },
+  { label: 'SUNDAE', policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', logo: TOKEN_LOGOS.SUNDAE },
+];
+
 const state = {
   wallet: null,
   api: null,
@@ -82,9 +100,10 @@ function renderFilter() {
   for (const p of state.proposals) {
     const id = p.target_policy_id || 'ADA';
     if (!tokens[id]) {
+      const localLogo = id !== 'ADA' ? tokenLogo(id) : null;
       tokens[id] = {
         label: id === 'ADA' ? 'ADA' : (p.tokenName || shorten(id, 8)),
-        image: id === 'ADA' ? null : (p.tokenImage || null),
+        image: id === 'ADA' ? null : (p.tokenImage || localLogo),
         id,
       };
     }
@@ -164,8 +183,10 @@ function renderProposals() {
       `;
     }
 
-    const imgHtml = p.tokenImage
-      ? `<img class="token-thumb" src="${escHtml(p.tokenImage)}" alt="" onerror="this.style.display='none'">`
+    const localLogo = tokenLogo(p.target_policy_id);
+    const imgSrc = p.tokenImage || localLogo;
+    const imgHtml = imgSrc
+      ? `<img class="token-thumb" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
       : '';
 
     return `
@@ -204,6 +225,12 @@ function renderProposals() {
       openAuditModal(id);
     });
   });
+}
+
+function tokenLogo(policyId) {
+  if (!policyId) return null;
+  const t = CURATED_TOKENS.find(t => t.policy === policyId);
+  return t ? t.logo : null;
 }
 
 function escHtml(s) {
@@ -350,8 +377,10 @@ async function openVoteModal(proposalId) {
       ? `Circulating: ${formatWeight(proposal.circulatingSupply)}`
       : '';
 
-    const imgHtml = proposal.tokenImage
-      ? `<img class="token-logo" src="${escHtml(proposal.tokenImage)}" alt="" onerror="this.style.display='none'">`
+    const localLogo = tokenLogo(proposal.target_policy_id);
+    const imgSrc = proposal.tokenImage || localLogo;
+    const imgHtml = imgSrc
+      ? `<img class="token-logo" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
       : '';
 
     $('#voteTokenInfo').innerHTML = `
@@ -562,11 +591,48 @@ async function openAuditModal(proposalId) {
 
 $('#createBtn').addEventListener('click', () => {
   if (!state.api) { toast('Connect wallet first', 'error'); return; }
+
+  const sel = $('#propTokenSelect');
+  sel.innerHTML = '<option value="">ADA</option>' +
+    CURATED_TOKENS.map(t => `<option value="${t.label}">${t.label}</option>`).join('') +
+    '<option value="custom">— Custom token —</option>';
+  sel.value = '';
+  $('#propCustomGroup').style.display = 'none';
+  $('#propAssetGroup').style.display = 'none';
+  $('#propPolicy').value = '';
+  $('#propAsset').value = '';
+
   $('#createModal').classList.add('open');
 });
 
+$('#propTokenSelect').addEventListener('change', () => {
+  const val = $('#propTokenSelect').value;
+  if (!val) {
+    $('#propCustomGroup').style.display = 'none';
+    $('#propAssetGroup').style.display = 'none';
+    $('#propPolicy').value = '';
+    $('#propAsset').value = '';
+  } else if (val === 'custom') {
+    $('#propCustomGroup').style.display = '';
+    $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+    $('#propPolicy').value = '';
+    $('#propAsset').value = '';
+  } else {
+    const token = CURATED_TOKENS.find(t => t.label === val);
+    if (token) {
+      $('#propCustomGroup').style.display = '';
+      $('#propAssetGroup').style.display = token.asset ? '' : 'none';
+      $('#propPolicy').value = token.policy;
+      $('#propAsset').value = token.asset || '';
+    }
+  }
+});
+
 $('#propPolicy').addEventListener('input', () => {
-  $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+  const val = $('#propTokenSelect').value;
+  if (val === 'custom') {
+    $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+  }
 });
 
 $('#createSubmitBtn').addEventListener('click', createProposal);
@@ -574,6 +640,7 @@ $('#createSubmitBtn').addEventListener('click', createProposal);
 async function createProposal() {
   const title = $('#propTitle').value.trim();
   const description = $('#propDesc').value.trim();
+  const tokenVal = $('#propTokenSelect').value;
   const policy = $('#propPolicy').value.trim();
   const asset = $('#propAsset').value.trim();
 
@@ -608,8 +675,11 @@ async function createProposal() {
     $('#createModal').classList.remove('open');
     $('#propTitle').value = '';
     $('#propDesc').value = '';
+    $('#propTokenSelect').value = '';
     $('#propPolicy').value = '';
     $('#propAsset').value = '';
+    $('#propCustomGroup').style.display = 'none';
+    $('#propAssetGroup').style.display = 'none';
     fetchProposals();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');

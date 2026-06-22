@@ -148,22 +148,28 @@ export default async function handler(req, res) {
       }
 
       if (totalBalance <= 0n && addrsToCheck.length > 0) {
-        try {
-          log(id, 'ada-check-addr', { url: `${KOIOS_URL}/address_info`, addrs: addrsToCheck.slice(0, 3).map(a => a.slice(0, 15) + '...') });
-          const result = await koiosPost(`${KOIOS_URL}/address_info`, { _addresses: addrsToCheck }, id);
-          if (Array.isArray(result)) {
-            const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', balance: a.balance }));
-            log(id, 'ada-addr-result', { count: result.length, balances });
-            debug.adaAddress = balances;
-            for (const entry of result) totalBalance += BigInt(entry.balance || '0');
-          } else {
-            log(id, 'ada-addr-null', { result });
-            debug.adaAddressFailed = true;
-            debug.adaAddressResult = JSON.stringify(result).slice(0, 100);
+        log(id, 'ada-check-addr-start', { totalAddrs: addrsToCheck.length });
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < addrsToCheck.length; i += BATCH_SIZE) {
+          const batch = addrsToCheck.slice(i, i + BATCH_SIZE);
+          log(id, 'ada-check-addr-batch', { batchIdx: i / BATCH_SIZE, batchSize: batch.length });
+          try {
+            const result = await koiosPost(`${KOIOS_URL}/address_info`, { _addresses: batch }, id);
+            if (Array.isArray(result)) {
+              const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', balance: a.balance }));
+              log(id, 'ada-addr-batch-result', { count: result.length, balances });
+              debug.adaAddress = (debug.adaAddress || []).concat(balances);
+              for (const entry of result) totalBalance += BigInt(entry.balance || '0');
+            } else {
+              log(id, 'ada-addr-batch-null', { batchIdx: i / BATCH_SIZE, result });
+              if (!debug.adaAddressFailures) debug.adaAddressFailures = [];
+              debug.adaAddressFailures.push({ batchIdx: i / BATCH_SIZE, result: JSON.stringify(result).slice(0, 100) });
+            }
+          } catch (e) {
+            log(id, 'koios-ada-addr-err', { msg: e.message });
+            if (!debug.adaAddressErrors) debug.adaAddressErrors = [];
+            debug.adaAddressErrors.push(e.message);
           }
-        } catch (e) {
-          log(id, 'koios-ada-addr-err', { msg: e.message });
-          debug.adaAddressError = e.message;
         }
       }
     } else {
