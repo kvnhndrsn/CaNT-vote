@@ -573,7 +573,6 @@ async function createProposal() {
   const description = $('#propDesc').value.trim();
   const policy = $('#propPolicy').value.trim();
   const asset = $('#propAsset').value.trim();
-  const blockInput = $('#propBlock').value.trim();
 
   if (!title || !description) {
     toast('Fill in title and description', 'error');
@@ -585,14 +584,6 @@ async function createProposal() {
   btn.textContent = 'Creating...';
 
   try {
-    const snapshotBlock = blockInput ? parseInt(blockInput) : null;
-
-    const payload = JSON.stringify({
-      title, description, policy, asset, snapshotBlock, timestamp: Date.now(),
-    });
-    const hexPayload = bytesToHex(new TextEncoder().encode(payload));
-    const sig = await state.api.signData(state.hexAddress, hexPayload);
-
     const res = await fetch('/api/proposals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -601,8 +592,9 @@ async function createProposal() {
         description,
         targetPolicyId: policy,
         targetAssetName: asset,
-        snapshotBlock,
         creatorAddress: state.address,
+        addresses: state.addresses,
+        stakeAddresses: state.stakeAddresses,
       }),
     });
 
@@ -615,7 +607,6 @@ async function createProposal() {
     $('#propDesc').value = '';
     $('#propPolicy').value = '';
     $('#propAsset').value = '';
-    $('#propBlock').value = '';
     fetchProposals();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');

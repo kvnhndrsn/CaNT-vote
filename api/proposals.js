@@ -5,6 +5,31 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+function defaultKoiosUrl(network) {
+  switch (network) {
+    case 'preprod': return 'https://preprod.koios.rest/api/v1';
+    case 'preview': return 'https://preview.koios.rest/api/v1';
+    case 'sanchonet': return 'https://sancho.koios.rest/api/v1';
+    default: return 'https://api.koios.rest/api/v1';
+  }
+}
+
+async function koiosPost(url, body) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+async function koiosGet(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
 function ipfsToHttp(url) {
   if (!url || typeof url !== 'string') return null;
   if (url.startsWith('ipfs://')) return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
@@ -16,25 +41,114 @@ function formatAssetId(proposal) {
   return `${proposal.target_policy_id}${proposal.target_asset_name || ''}`;
 }
 
-async function fetchAssetInfo(assetId) {
-  if (!assetId) return null;
-  const bfUrl = `https://cardano-${process.env.BLOCKFROST_NETWORK || 'mainnet'}.blockfrost.io/api/v0`;
-  const bfKey = process.env.BLOCKFROST_API_KEY;
-  if (!bfKey) return null;
+function extractAssetMeta(metadata) {
+  if (!metadata || typeof metadata !== 'object') return { name: null, image: null };
+  const cip25 = metadata['721'];
+  if (cip25 && typeof cip25 === 'object') {
+    for (const policyId of Object.keys(cip25)) {
+      const policy = cip25[policyId];
+      if (policy && typeof policy === 'object') {
+        const keys = Object.keys(policy);
+        if (keys.length > 0) {
+          const entry = policy[keys[0]];
+          if (entry && typeof entry === 'object') {
+            return {
+              name: typeof entry.name === 'string' ? entry.name : null,
+              image: typeof entry.image === 'string' ? ipfsToHttp(entry.image) : null,
+            };
+          }
+        }
+      }
+    }
+  }
+  return { name: null, image: null };
+}
+
+async function fetchAssetInfo(assetPolicy, assetName) {
+  if (!assetPolicy) return null;
+  const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
+  const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   try {
-    const resp = await fetch(`${bfUrl}/assets/${assetId}`, {
-      headers: { project_id: bfKey },
+    const result = await koiosPost(`${koiosUrl}/asset_info`, {
+      _asset_policy: assetPolicy,
+      _asset_name: assetName || '',
     });
-    if (!resp.ok) return null;
-    const info = await resp.json();
+    if (!Array.isArray(result) || result.length === 0) return null;
+    const info = result[0];
+    const { name, image } = extractAssetMeta(info.minting_tx_metadata);
     return {
-      supply: info.quantity,
-      name: info.onchain_metadata?.name || null,
-      image: ipfsToHttp(info.onchain_metadata?.image || null),
+      supply: info.total_supply,
+      name,
+      image,
     };
   } catch {
     return null;
   }
+}
+
+async function fetchLatestBlock() {
+  const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
+  const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
+  try {
+    const tip = await koiosGet(`${koiosUrl}/tip`);
+    if (!tip) return null;
+    return { height: tip.block_no, slot: tip.slot_no };
+  } catch {
+    return null;
+  }
+}
+
+async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targetAssetName) {
+  const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
+  const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
+  const isADA = !targetPolicyId;
+  let totalBalance = 0n;
+
+  if (isADA) {
+    if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
+      const result = await koiosPost(`${koiosUrl}/account_info`, { _stake_addresses: stakeAddresses });
+      if (Array.isArray(result)) {
+        for (const acct of result) totalBalance += BigInt(acct.balance || '0');
+      }
+    }
+    if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
+      const result = await koiosPost(`${koiosUrl}/address_info`, { _addresses: addresses });
+      if (Array.isArray(result)) {
+        for (const entry of result) totalBalance += BigInt(entry.balance || '0');
+      }
+    }
+  } else {
+    if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
+      const result = await koiosPost(`${koiosUrl}/account_assets`, { _stake_addresses: stakeAddresses });
+      if (Array.isArray(result)) {
+        for (const acct of result) {
+          if (Array.isArray(acct.asset_list)) {
+            for (const asset of acct.asset_list) {
+              if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '')) {
+                totalBalance += BigInt(asset.quantity || '0');
+              }
+            }
+          }
+        }
+      }
+    }
+    if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
+      const result = await koiosPost(`${koiosUrl}/address_assets`, { _addresses: addresses });
+      if (Array.isArray(result)) {
+        for (const entry of result) {
+          if (Array.isArray(entry.asset_list)) {
+            for (const asset of entry.asset_list) {
+              if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '')) {
+                totalBalance += BigInt(asset.quantity || '0');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return totalBalance;
 }
 
 export default async function handler(req, res) {
@@ -77,7 +191,9 @@ export default async function handler(req, res) {
         }
 
         const assetId = formatAssetId(proposal);
-        const assetInfo = await fetchAssetInfo(assetId);
+        const assetInfo = assetId
+          ? await fetchAssetInfo(proposal.target_policy_id, proposal.target_asset_name)
+          : null;
 
         return res.json({
           ...proposal,
@@ -114,11 +230,17 @@ export default async function handler(req, res) {
         }
       }
 
-      const uniqueAssets = [...new Set(data.map(p => formatAssetId(p)))];
+      const assetMap = {};
+      for (const p of data) {
+        const id = formatAssetId(p);
+        if (id && !assetMap[id]) {
+          assetMap[id] = { policy: p.target_policy_id, name: p.target_asset_name };
+        }
+      }
       const assetInfos = {};
-      await Promise.all(uniqueAssets.filter(id => id).map(async (assetId) => {
-        const info = await fetchAssetInfo(assetId);
-        if (info) assetInfos[assetId] = info;
+      await Promise.all(Object.entries(assetMap).map(async ([id, { policy, name }]) => {
+        const info = await fetchAssetInfo(policy, name);
+        if (info) assetInfos[id] = info;
       }));
 
       data.forEach(p => {
@@ -142,37 +264,27 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      let { title, description, targetPolicyId, targetAssetName, snapshotBlock, creatorAddress } = req.body;
+      const { title, description, targetPolicyId, targetAssetName, creatorAddress, addresses, stakeAddresses } = req.body;
 
       if (!title || !description || !creatorAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      const blockfrostUrl = `https://cardano-${process.env.BLOCKFROST_NETWORK || 'mainnet'}.blockfrost.io/api/v0`;
-      const blockfrostHeaders = { project_id: process.env.BLOCKFROST_API_KEY || '' };
+      const balance = await checkTokenBalance(
+        addresses || [creatorAddress],
+        stakeAddresses || [],
+        targetPolicyId || '',
+        targetAssetName || ''
+      );
 
-      let snapshotSlot = 0;
-      if (!snapshotBlock) {
-        try {
-          const tipResp = await fetch(`${blockfrostUrl}/blocks/latest`, { headers: blockfrostHeaders });
-          if (tipResp.ok) {
-            const tip = await tipResp.json();
-            snapshotBlock = tip.height || tip.block;
-            snapshotSlot = tip.slot || 0;
-          }
-        } catch {
-          return res.status(500).json({ error: 'Could not fetch latest block. Provide a snapshot block or set BLOCKFROST_API_KEY.' });
-        }
-      } else {
-        try {
-          const tipResp = await fetch(`${blockfrostUrl}/blocks/${snapshotBlock}`, { headers: blockfrostHeaders });
-          if (tipResp.ok) {
-            const block = await tipResp.json();
-            snapshotSlot = block.slot || 0;
-          }
-        } catch {
-          // non-critical
-        }
+      if (balance <= 0n) {
+        const label = !targetPolicyId ? 'ADA' : 'this token';
+        return res.status(403).json({ error: `You must hold ${label} to create a proposal for it.` });
+      }
+
+      const tip = await fetchLatestBlock();
+      if (!tip) {
+        return res.status(500).json({ error: 'Could not fetch latest block. Try again later.' });
       }
 
       const { data, error } = await supabase
@@ -182,8 +294,8 @@ export default async function handler(req, res) {
           description,
           target_policy_id: targetPolicyId,
           target_asset_name: targetAssetName || '',
-          snapshot_block: snapshotBlock,
-          snapshot_slot: snapshotSlot,
+          snapshot_block: tip.height,
+          snapshot_slot: tip.slot,
           creator_address: creatorAddress,
         })
         .select()
