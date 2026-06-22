@@ -234,7 +234,7 @@ async function fetchMinswapData() {
         const poolId = (pool.lp_asset && pool.lp_asset.token_name) || '';
         if (poolId) {
           const lpKey = (KNOWN_DEX_LP[0].policyId + poolId).toLowerCase();
-          lpMap[lpKey] = { poolId, tvlAda: pool.liquidity || 0 };
+          lpMap[lpKey] = { poolId, tvlAda: pool.liquidity_currency || 0 };
         }
       }
     }
