@@ -157,8 +157,9 @@ async function fetchLatestBlock() {
     log(id, 'fetch-tip', { url: `${koiosUrl}/tip` });
     const tip = await koiosGet(`${koiosUrl}/tip`);
     log(id, 'tip-result', { tip });
-    if (!tip) return null;
-    const result = { height: tip.block_no, slot: tip.slot_no };
+    if (!tip || !Array.isArray(tip) || tip.length === 0) return null;
+    const t = tip[0];
+    const result = { height: t.block_no, slot: t.slot_no };
     log(id, 'tip-parsed', { result });
     return result;
   } catch (e) {
