@@ -486,7 +486,6 @@ async function openVoteModal(proposalId) {
     const optionsDiv = $('#voteOptions');
     const tally = proposal.tally || {};
     const tallyTotal = BigInt(proposal.totalWeight || 0);
-    const supply = isADA ? totalAdaSupply : (proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null);
 
     optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
       const weight = tally[c];
