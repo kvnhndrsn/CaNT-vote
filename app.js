@@ -482,7 +482,10 @@ async function submitVote() {
 
     console.log('[vote] server response status:', voteRes.status);
     const data = await voteRes.json();
-    if (!voteRes.ok) throw new Error(data.error);
+    if (!voteRes.ok) {
+      console.log('[vote] full error response:', data);
+      throw new Error(data.error + (data.debug ? ' (see console for debug info)' : ''));
+    }
 
     toast(`Vote cast! Weight: ${formatWeight(data.stakeWeight)}`, 'success');
     $('#voteModal').classList.remove('open');
