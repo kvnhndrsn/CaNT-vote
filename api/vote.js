@@ -70,8 +70,8 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Proposal not found' });
     }
 
-    log(id, 'proposal-found', { block: proposal.snapshot_block, policy: proposal.target_policy_id, asset: proposal.target_asset_name });
-    debug.proposal = { block: proposal.snapshot_block, policy: proposal.target_policy_id, asset: proposal.target_asset_name };
+    log(id, 'proposal-found', { policy: proposal.target_policy_id, asset: proposal.target_asset_name });
+    debug.proposal = { policy: proposal.target_policy_id, asset: proposal.target_asset_name };
 
     let addrsToCheck = Array.isArray(addresses) && addresses.length > 0 ? [...addresses] : [address];
     log(id, 'addrs-initial', { count: addrsToCheck.length, samples: addrsToCheck.slice(0, 2).map(a => a.slice(0, 15) + '...') });

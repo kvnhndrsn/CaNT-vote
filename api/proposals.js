@@ -252,6 +252,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    const EXPIRY_HOURS = 72;
+
+    function addExpiry(p) {
+      const created = new Date(p.created_at).getTime();
+      p.expiresAt = new Date(created + EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+      p.expired = Date.now() > new Date(p.expiresAt).getTime();
+      return p;
+    }
+
     if (req.method === 'GET') {
       if (req.query.id) {
         const { data: proposal, error: propErr } = await supabase
@@ -263,6 +272,8 @@ export default async function handler(req, res) {
         if (propErr || !proposal) {
           return res.status(404).json({ error: 'Proposal not found' });
         }
+
+        addExpiry(proposal);
 
         const { data: votes, error: votesErr } = await supabase
           .from('votes')
@@ -306,9 +317,15 @@ export default async function handler(req, res) {
 
       if (error) throw error;
 
-      if (data.length === 0) return res.json([]);
+      const active = data.filter(p => {
+        const created = new Date(p.created_at).getTime();
+        const elapsed = Date.now() - created;
+        return elapsed < EXPIRY_HOURS * 60 * 60 * 1000;
+      });
 
-      const ids = data.map(p => p.id);
+      if (active.length === 0) return res.json([]);
+
+      const ids = active.map(p => p.id);
       const { data: votes } = await supabase
         .from('votes')
         .select('proposal_id, vote_choice, stake_weight')
@@ -324,7 +341,7 @@ export default async function handler(req, res) {
       }
 
       const assetMap = {};
-      for (const p of data) {
+      for (const p of active) {
         const id = formatAssetId(p);
         if (id && !assetMap[id]) {
           assetMap[id] = { policy: p.target_policy_id, name: p.target_asset_name };
@@ -336,7 +353,8 @@ export default async function handler(req, res) {
         if (info) assetInfos[id] = info;
       }));
 
-      data.forEach(p => {
+      active.forEach(p => {
+        addExpiry(p);
         const s = summaries[p.id] || {};
         const weights = Object.values(s).map(v => typeof v === 'bigint' ? v : BigInt(v));
         const total = weights.reduce((a, b) => a + b, 0n);
@@ -353,7 +371,7 @@ export default async function handler(req, res) {
         p.tokenImage = ai.image || null;
       });
 
-      return res.json(data);
+      return res.json(active);
     }
 
     if (req.method === 'POST') {
@@ -381,13 +399,6 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: `You must hold ${label} to create a proposal for it.` });
       }
 
-      log(pid, 'fetch-tip');
-      const tip = await fetchLatestBlock();
-      if (!tip) {
-        return res.status(500).json({ error: 'Could not fetch latest block. Try again later.' });
-      }
-      log(pid, 'tip', { height: tip.height, slot: tip.slot });
-
       const { data, error } = await supabase
         .from('proposals')
         .insert({
@@ -395,8 +406,8 @@ export default async function handler(req, res) {
           description,
           target_policy_id: targetPolicyId,
           target_asset_name: targetAssetName || '',
-          snapshot_block: tip.height,
-          snapshot_slot: tip.slot,
+          snapshot_block: 0,
+          snapshot_slot: 0,
           creator_address: creatorAddress,
         })
         .select()
@@ -405,6 +416,41 @@ export default async function handler(req, res) {
       if (error) throw error;
       log(pid, 'created', { id: data.id });
       return res.status(201).json(data);
+    }
+
+    if (req.method === 'DELETE') {
+      const pid = 'delete-' + reqId();
+      const { id, creatorAddress } = req.body;
+
+      if (!id || !creatorAddress) {
+        return res.status(400).json({ error: 'Missing proposal id or creatorAddress' });
+      }
+
+      log(pid, 'verify', { id, creator: creatorAddress.slice(0, 15) + '...' });
+
+      const { data: proposal, error: findErr } = await supabase
+        .from('proposals')
+        .select('creator_address')
+        .eq('id', id)
+        .single();
+
+      if (findErr || !proposal) {
+        return res.status(404).json({ error: 'Proposal not found' });
+      }
+
+      if (proposal.creator_address !== creatorAddress) {
+        return res.status(403).json({ error: 'Only the creator can delete this proposal' });
+      }
+
+      const { error: delErr } = await supabase
+        .from('proposals')
+        .delete()
+        .eq('id', id);
+
+      if (delErr) throw delErr;
+
+      log(pid, 'deleted', { id });
+      return res.json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

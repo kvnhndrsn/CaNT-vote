@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
     const { data: proposal, error: propErr } = await supabase
       .from('proposals')
-      .select('id, title, target_policy_id, target_asset_name, snapshot_block, snapshot_slot, created_at')
+      .select('id, title, target_policy_id, target_asset_name, created_at')
       .eq('id', proposalId)
       .single();
 

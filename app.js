@@ -130,6 +130,29 @@ function renderFilter() {
   });
 }
 
+function pieSvg(choices, total) {
+  if (!total || total === '0') return '';
+  const t = Number(total);
+  const colors = ['#22c55e', '#ef4444', '#a1a1aa'];
+  let accum = 0;
+  let paths = '';
+  choices.forEach(([, weight], i) => {
+    const pct = Number(weight) / t;
+    if (pct === 0) return;
+    const a1 = accum * 360;
+    const a2 = (accum + pct) * 360;
+    accum += pct;
+    const r = 8, cx = 12, cy = 12;
+    const x1 = cx + r * Math.sin(a1 * Math.PI / 180);
+    const y1 = cy - r * Math.cos(a1 * Math.PI / 180);
+    const x2 = cx + r * Math.sin(a2 * Math.PI / 180);
+    const y2 = cy - r * Math.cos(a2 * Math.PI / 180);
+    const large = pct > 0.5 ? 1 : 0;
+    paths += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${colors[i % colors.length]}"/>`;
+  });
+  return `<svg width="16" height="16" viewBox="0 0 24 24" style="flex-shrink:0">${paths}</svg>`;
+}
+
 function renderProposals() {
   const list = $('#proposalList');
   const count = $('#proposalCount');
@@ -155,29 +178,16 @@ function renderProposals() {
     const summary = p.voteSummary || {};
     const total = BigInt(p.totalVoteWeight || '0');
     const choices = Object.entries(summary);
+    const isCreator = state.address && p.creator_address === state.address;
 
     let tallyHtml = '';
     if (choices.length > 0) {
-      const supply = p.circulatingSupply ? BigInt(p.circulatingSupply) : null;
-      const pctOfSupply = supply && supply > 0n
-        ? (Number(total) / Number(supply) * 100).toFixed(2) + '%'
-        : null;
-
       tallyHtml = `
         <div class="card-tally">
-          ${choices.map(([choice, weight]) => {
-            const pct = pctNum(weight, total.toString());
-            return `
-              <div class="card-tally-row">
-                <span class="card-tally-label">${escHtml(choice)}</span>
-                <span class="card-tally-bar"><span style="width:${pct}%"></span></span>
-                <span class="card-tally-pct">${pctStr(weight, total.toString())}</span>
-              </div>
-            `;
-          }).join('')}
-          <div class="card-tally-total">
-            Total: ${formatWeight(total.toString())} vote(s)
-            ${pctOfSupply ? `&middot; ${pctOfSupply} of supply` : ''}
+          <div class="card-tally-row">
+            ${pieSvg(choices, total.toString())}
+            <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${pctStr(w, total.toString())}`).join(' · ')}</span>
+            <span class="card-tally-pct">${formatWeight(total.toString())}</span>
           </div>
         </div>
       `;
@@ -189,24 +199,31 @@ function renderProposals() {
       ? `<img class="token-thumb" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
       : '';
 
+    const deleteBtn = isCreator
+      ? `<button class="btn btn-danger delete-btn" data-id="${p.id}">Delete</button>`
+      : '';
+
     return `
       <div class="proposal-card" data-id="${p.id}">
         <div class="card-header">
           ${imgHtml}
-          <div>
-            <h3>${escHtml(p.title)}</h3>
+          <div class="card-body">
+            <div class="card-title-row">
+              <h3>${escHtml(p.title)}</h3>
+              <div class="card-actions">
+                <button class="btn btn-primary vote-btn">Vote</button>
+                <button class="btn audit-btn">Audit</button>
+                ${deleteBtn}
+              </div>
+            </div>
             <div class="meta">
               <span>${escHtml(assetLabel)}</span>
-              <span>Snapshot: #${p.snapshot_block}</span>
+              <span class="expiry" data-expires="${p.expiresAt}">--</span>
               <span>by ${shorten(p.creator_address, 6)}</span>
             </div>
+            <div class="desc">${escHtml(p.description)}</div>
+            ${tallyHtml}
           </div>
-        </div>
-        <div class="desc">${escHtml(p.description)}</div>
-        ${tallyHtml}
-        <div class="actions">
-          <button class="btn btn-sm btn-primary vote-btn">Vote</button>
-          <button class="btn btn-sm audit-btn">Audit</button>
         </div>
       </div>
     `;
@@ -224,6 +241,43 @@ function renderProposals() {
       const id = e.target.closest('.proposal-card').dataset.id;
       openAuditModal(id);
     });
+  });
+
+  list.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      if (!confirm('Delete this proposal?')) return;
+      try {
+        const res = await fetch('/api/proposals', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, creatorAddress: state.address }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        toast('Proposal deleted', 'success');
+        fetchProposals();
+      } catch (ex) {
+        toast('Delete failed: ' + ex.message, 'error');
+      }
+    });
+  });
+
+  updateCountdowns();
+}
+
+function updateCountdowns() {
+  document.querySelectorAll('.expiry').forEach(el => {
+    const expires = new Date(el.dataset.expires).getTime();
+    const now = Date.now();
+    const diff = expires - now;
+    if (diff <= 0) {
+      el.textContent = 'Expired';
+      return;
+    }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent = h + 'h ' + m + 'm ' + s + 's';
   });
 }
 
@@ -328,7 +382,7 @@ function updateWalletUI() {
   const area = $('#walletArea');
   if (state.address) {
     area.innerHTML = `
-      <span class="tooltip" style="margin-right:0.25rem">${shorten(state.address, 8)}</span>
+      <span class="tooltip" style="margin-right:0.1rem;font-size:0.7rem">${shorten(state.address, 5)}</span>
       <button class="btn btn-sm" id="disconnectBtn">Disconnect</button>
     `;
     $('#disconnectBtn').addEventListener('click', disconnectWallet);
@@ -385,7 +439,7 @@ async function openVoteModal(proposalId) {
 
     $('#voteTokenInfo').innerHTML = `
       ${imgHtml}
-      <span>Snapshot: #${proposal.snapshot_block} &middot; ${escHtml(tokenLabel)}${supplyInfo ? ' &middot; ' + supplyInfo : ''}</span>
+      <span>${escHtml(tokenLabel)}${supplyInfo ? ' &middot; ' + supplyInfo : ''}</span>
     `;
 
     const optionsDiv = $('#voteOptions');
@@ -540,7 +594,7 @@ async function openAuditModal(proposalId) {
     if (!res.ok) throw new Error('Audit data not found');
     const data = await res.json();
 
-    $('#auditInfo').textContent = `${data.votes.length} vote(s) · Snapshot: #${data.proposal.snapshot_block}`;
+    $('#auditInfo').textContent = `${data.votes.length} vote(s)`;
 
     if (data.votes.length === 0) {
       $('#auditTableWrap').innerHTML = '<p class="tooltip" style="text-align:center;padding:1rem 0">No votes recorded yet.</p>';
@@ -703,11 +757,23 @@ $$('.modal-overlay').forEach(overlay => {
   });
 });
 
+/* ---------- Ticker ---------- */
+
+let tickerInterval = null;
+
+function startTicker() {
+  if (tickerInterval) return;
+  tickerInterval = setInterval(() => {
+    updateCountdowns();
+  }, 1000);
+}
+
 /* ---------- Init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
   updateWalletUI();
   fetchProposals();
+  startTicker();
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);
