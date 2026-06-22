@@ -35,12 +35,12 @@ const TOKEN_LOGOS = {
 };
 
 const CURATED_TOKENS = [
-  { label: 'SNEK', policy: '279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f', asset: '534e454b', logo: TOKEN_LOGOS.SNEK },
-  { label: 'NIGHT', policy: '0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa', asset: '4e49474854', logo: TOKEN_LOGOS.NIGHT },
-  { label: 'WMTX', policy: 'e5a42a1a1d3d1da71b0449663c32798725888d2eb0843c4dabeca05a', asset: '576f726c644d6f62696c65546f6b656e58', logo: TOKEN_LOGOS.WMTX },
-  { label: 'MIN', policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', logo: TOKEN_LOGOS.MIN },
-  { label: 'STRIKE', policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', logo: TOKEN_LOGOS.STRIKE },
-  { label: 'SUNDAE', policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', logo: TOKEN_LOGOS.SUNDAE },
+  { label: 'SNEK',  policy: '279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f', asset: '534e454b', fingerprint: 'asset108xu02ckwrfc8qs9d97mgyh4kn8gdu9w8f5sxk', logo: TOKEN_LOGOS.SNEK },
+  { label: 'NIGHT', policy: '0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa', asset: '4e49474854', fingerprint: 'asset1wd3llgkhsw6etxf2yca6cgk9ssrpva3wf0pq9a', logo: TOKEN_LOGOS.NIGHT },
+  { label: 'WMTX',  policy: 'e5a42a1a1d3d1da71b0449663c32798725888d2eb0843c4dabeca05a', asset: '576f726c644d6f62696c65546f6b656e58', fingerprint: 'asset1l2xup5vr08s07lxg5c4kkj7ur624rv5ayzhyc7', logo: TOKEN_LOGOS.WMTX },
+  { label: 'MIN',   policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', fingerprint: 'asset1d9v7aptfvpx7we2la8f25kwprkj2ma5rp6uwzv', logo: TOKEN_LOGOS.MIN },
+  { label: 'STRIKE',policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', fingerprint: 'asset1tdalpjgjmt2vrhq9fvwzxqgqcq8ydr7e7e0eta', logo: TOKEN_LOGOS.STRIKE },
+  { label: 'SUNDAE',policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', fingerprint: 'asset1m4u92ke6820pkk07m8qmmguye02ewr8g6tezr0', logo: TOKEN_LOGOS.SUNDAE },
 ];
 
 const state = {
@@ -98,6 +98,7 @@ async function fetchProposals() {
       throw new Error(body.error || `Server error (${res.status})`);
     }
     state.proposals = await res.json();
+    renderMiniCards();
     renderFilter();
     renderProposals();
   } catch (e) {
@@ -107,17 +108,73 @@ async function fetchProposals() {
   }
 }
 
+function renderMiniCards() {
+  const container = $('#miniCards');
+  const proposals = state.proposals;
+  if (proposals.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const withVotes = proposals.filter(p => p.totalVoteWeight && BigInt(p.totalVoteWeight) > 0n);
+
+  // 1) Most votes (highest totalVoteWeight)
+  let mostVotesCard = '';
+  if (withVotes.length > 0) {
+    const best = withVotes.reduce((a, b) => BigInt(a.totalVoteWeight) > BigInt(b.totalVoteWeight) ? a : b);
+    mostVotesCard = `
+      <div class="mini-card">
+        <span class="mini-label">Most Votes</span>
+        <span class="mini-value">${formatWeight(best.totalVoteWeight)}</span>
+        <span class="mini-sub">${escHtml(best.title)}</span>
+      </div>`;
+  }
+
+  // 2) Highest % of total supply voted
+  let highestPctCard = '';
+  if (withVotes.length > 0) {
+    const pctVals = withVotes.map(p => {
+      const total = p.totalSupply ? Number(BigInt(p.totalSupply)) : null;
+      const voted = Number(BigInt(p.totalVoteWeight));
+      const pct = total && total > 0 ? (voted / total) * 100 : 0;
+      return { p, pct };
+    });
+    const best = pctVals.reduce((a, b) => a.pct > b.pct ? a : b);
+    if (best.pct > 0) {
+      highestPctCard = `
+        <div class="mini-card">
+          <span class="mini-label">Highest Turnout</span>
+          <span class="mini-value">${best.pct >= 1 ? best.pct.toFixed(2) : best.pct.toFixed(4)}%</span>
+          <span class="mini-sub">${escHtml(best.p.title)}</span>
+        </div>`;
+    }
+  }
+
+  // 3) Newest proposal
+  const newest = proposals.reduce((a, b) => new Date(a.created_at) > new Date(b.created_at) ? a : b);
+  const newestCard = `
+    <div class="mini-card">
+      <span class="mini-label">Newest</span>
+      <span class="mini-value">${escHtml(newest.title)}</span>
+      <span class="mini-sub">${new Date(newest.created_at).toLocaleDateString()}</span>
+    </div>`;
+
+  container.innerHTML = `
+    <div class="mini-cards-inner">
+      ${mostVotesCard || '<div class="mini-card mini-card-empty"><span class="mini-label">Most Votes</span><span class="mini-sub">No votes yet</span></div>'}
+      ${highestPctCard || '<div class="mini-card mini-card-empty"><span class="mini-label">Highest Turnout</span><span class="mini-sub">No votes yet</span></div>'}
+      ${newestCard}
+    </div>`;
+}
+
 function renderFilter() {
   const tokens = {};
   for (const p of state.proposals) {
-    const id = p.target_policy_id || 'ADA';
+    const id = p.target_fingerprint || p.target_policy_id || 'ADA';
     if (!tokens[id]) {
-      const localLogo = id !== 'ADA' ? tokenLogo(id) : null;
-      tokens[id] = {
-        label: id === 'ADA' ? 'ADA' : (p.tokenName || shorten(id, 8)),
-        image: id === 'ADA' ? null : (p.tokenImage || localLogo),
-        id,
-      };
+      const localLogo = id !== 'ADA' ? tokenLogo(p.target_policy_id, p.target_fingerprint) : null;
+      const displayLabel = id === 'ADA' ? 'ADA' : (p.tokenName || (p.target_fingerprint ? shorten(p.target_fingerprint, 5) : shorten(p.target_policy_id, 8)));
+      tokens[id] = { label: displayLabel, image: id === 'ADA' ? null : (p.tokenImage || localLogo), id };
     }
   }
   const list = Object.values(tokens);
@@ -172,7 +229,10 @@ function renderProposals() {
   const list = $('#proposalList');
   const count = $('#proposalCount');
   const filtered = state.filterToken
-    ? state.proposals.filter(p => (state.filterToken === 'ADA' ? !p.target_policy_id : p.target_policy_id === state.filterToken))
+    ? state.proposals.filter(p => {
+        if (state.filterToken === 'ADA') return !p.target_policy_id;
+        return (p.target_fingerprint && p.target_fingerprint === state.filterToken) || p.target_policy_id === state.filterToken;
+      })
     : state.proposals;
   count.textContent = filtered.length;
 
@@ -186,9 +246,11 @@ function renderProposals() {
 
   list.innerHTML = filtered.map(p => {
     const isADA = !p.target_policy_id;
-    const assetLabel = isADA ? 'ADA' : (p.tokenName || (p.target_asset_name
-      ? shorten(p.target_policy_id, 6) + '.' + p.target_asset_name
-      : shorten(p.target_policy_id, 6)));
+    const assetLabel = isADA ? 'ADA' : (p.tokenName || (p.target_fingerprint
+      ? shorten(p.target_fingerprint, 5)
+      : (p.target_asset_name
+        ? shorten(p.target_policy_id, 6) + '.' + p.target_asset_name
+        : shorten(p.target_policy_id, 6))));
 
     const summary = p.voteSummary || {};
     const total = BigInt(p.totalVoteWeight || '0');
@@ -242,7 +304,7 @@ function renderProposals() {
       `;
     }
 
-    const localLogo = tokenLogo(p.target_policy_id);
+    const localLogo = tokenLogo(p.target_policy_id, p.target_fingerprint);
     const imgSrc = p.tokenImage || localLogo;
     const imgHtml = imgSrc
       ? `<img class="token-thumb" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
@@ -345,11 +407,18 @@ function updateCountdowns() {
   });
 }
 
-function tokenLogo(policyId, label) {
-  if (!policyId) return TOKEN_LOGOS.ADA;
+function tokenLogo(policyId, fingerprint, label) {
+  if (!policyId && !fingerprint) return TOKEN_LOGOS.ADA;
   if (label && TOKEN_LOGOS[label]) return TOKEN_LOGOS[label];
-  const t = CURATED_TOKENS.find(t => t.policy === policyId);
-  return t ? t.logo : null;
+  if (fingerprint) {
+    const t = CURATED_TOKENS.find(t => t.fingerprint === fingerprint);
+    if (t) return t.logo;
+  }
+  if (policyId) {
+    const t = CURATED_TOKENS.find(t => t.policy === policyId);
+    if (t) return t.logo;
+  }
+  return null;
 }
 
 function escHtml(s) {
@@ -487,10 +556,12 @@ async function openVoteModal(proposalId) {
     $('#voteModalTitle').textContent = proposal.title;
 
     const isADA = !proposal.target_policy_id;
-    const assetId = isADA ? 'lovelace' : (proposal.target_policy_id + (proposal.target_asset_name || ''));
-    const tokenLabel = isADA ? 'ADA' : (proposal.tokenName || (proposal.target_asset_name
-      ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
-      : shorten(proposal.target_policy_id, 6)));
+    const assetId = isADA ? 'lovelace' : (proposal.target_fingerprint || proposal.target_policy_id + (proposal.target_asset_name || ''));
+    const tokenLabel = isADA ? 'ADA' : (proposal.tokenName || (proposal.target_fingerprint
+      ? shorten(proposal.target_fingerprint, 5)
+      : (proposal.target_asset_name
+        ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
+        : shorten(proposal.target_policy_id, 6))));
 
     const totalS = proposal.totalSupply ? BigInt(proposal.totalSupply) : null;
     const circS = proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null;
@@ -500,7 +571,7 @@ async function openVoteModal(proposalId) {
     else if (totalS) supplyInfo.push('supply: ' + formatWeight(totalS.toString()));
     const unitLabel = isADA ? 'lovelace' : tokenLabel;
 
-    const localLogo = tokenLogo(proposal.target_policy_id);
+    const localLogo = tokenLogo(proposal.target_policy_id, proposal.target_fingerprint);
     const imgSrc = proposal.tokenImage || localLogo;
     const imgHtml = imgSrc
       ? `<img class="token-logo" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`

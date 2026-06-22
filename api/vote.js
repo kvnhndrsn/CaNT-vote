@@ -116,7 +116,9 @@ export default async function handler(req, res) {
     const isADA = !proposal.target_policy_id;
     const targetPolicyId = proposal.target_policy_id || '';
     const targetAssetName = proposal.target_asset_name || '';
+    const targetFingerprint = proposal.target_fingerprint || null;
     const matchAsset = (asset) => {
+      if (targetFingerprint) return asset.fingerprint === targetFingerprint;
       if (asset.policy_id !== targetPolicyId) return false;
       if (!targetAssetName) return true;
       return (asset.asset_name || '') === targetAssetName;

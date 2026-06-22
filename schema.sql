@@ -6,6 +6,7 @@ CREATE TABLE proposals (
     description TEXT NOT NULL,
     target_policy_id VARCHAR(64) NOT NULL,
     target_asset_name VARCHAR(128) NOT NULL DEFAULT '',
+    target_fingerprint VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     snapshot_block BIGINT NOT NULL,
     snapshot_slot BIGINT NOT NULL DEFAULT 0,

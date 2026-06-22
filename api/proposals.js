@@ -119,6 +119,7 @@ async function fetchAssetInfo(assetPolicy, assetName) {
   let supply = null;
   let name = null;
   let image = null;
+  let fingerprint = null;
   try {
     log(id, 'fetch', { policy: assetPolicy.slice(0, 16) + '...', name: assetName || '(empty)' });
     const result = await koiosPost(`${koiosUrl}/asset_info`, {
@@ -127,8 +128,9 @@ async function fetchAssetInfo(assetPolicy, assetName) {
     });
     if (Array.isArray(result) && result.length > 0) {
       const info = result[0];
-      log(id, 'got-info', { supply: info.total_supply, hasMeta: !!info.minting_tx_metadata });
+      log(id, 'got-info', { supply: info.total_supply, hasMeta: !!info.minting_tx_metadata, fingerprint: info.fingerprint });
       supply = info.total_supply;
+      fingerprint = info.fingerprint || null;
       const meta = extractAssetMeta(info.minting_tx_metadata);
       name = meta.name;
       image = meta.image;
@@ -146,7 +148,7 @@ async function fetchAssetInfo(assetPolicy, assetName) {
       if (!image) image = reg.image;
     }
   }
-  return { supply, name, image };
+  return { supply, name, image, fingerprint };
 }
 
 async function fetchAdaSupply() {
@@ -185,12 +187,13 @@ async function fetchLatestBlock() {
   }
 }
 
-async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targetAssetName) {
+async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targetAssetName, targetFingerprint) {
   const id = 'check-' + reqId();
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   const isADA = !targetPolicyId;
   const matchAsset = (asset) => {
+    if (targetFingerprint) return asset.fingerprint === targetFingerprint;
     if (asset.policy_id !== targetPolicyId) return false;
     if (!targetAssetName) return true;
     return (asset.asset_name || '') === targetAssetName;
@@ -332,6 +335,7 @@ export default async function handler(req, res) {
 
         return res.json({
           ...proposal,
+          target_fingerprint: proposal.target_fingerprint || null,
           voterCount: votes.length,
           totalWeight: totalWeight.toString(),
           tally: formattedTally,
@@ -439,6 +443,12 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: `You must hold ${label} to create a proposal for it.` });
       }
 
+      let fingerprint = null;
+      if (targetPolicyId && targetAssetName) {
+        const info = await fetchAssetInfo(targetPolicyId, targetAssetName);
+        if (info && info.fingerprint) fingerprint = info.fingerprint;
+      }
+
       const { data, error } = await supabase
         .from('proposals')
         .insert({
@@ -446,6 +456,7 @@ export default async function handler(req, res) {
           description,
           target_policy_id: targetPolicyId,
           target_asset_name: targetAssetName || '',
+          target_fingerprint: fingerprint,
           snapshot_block: 0,
           snapshot_slot: 0,
           creator_address: creatorAddress,
