@@ -316,7 +316,11 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 
 .token-thumb { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; object-fit: cover; margin-top: 0.1rem; }
 
+.token-thumb[src=""], .token-thumb:not([src]) { display: none; }
+
 .token-logo { width: 20px; height: 20px; border-radius: 50%; vertical-align: middle; object-fit: cover; }
+
+.token-logo[src=""], .token-logo:not([src]) { display: none; }
 
 .mini-cards { margin-bottom: 0.75rem; }
 
@@ -330,6 +334,16 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
   display: flex; flex-direction: column; gap: 0.15rem;
   min-width: 0;
 }
+
+.mini-tally-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--surface2); margin: 0.1rem 0; }
+.mini-tally-seg { min-width: 1px; }
+.mini-tally-yes { background: #22c55e; }
+.mini-tally-no { background: #ef4444; }
+.mini-tally-abs { background: #52525b; }
+
+.mini-tally-pcts { display: flex; gap: 0.4rem; font-size: 0.6rem; font-weight: 600; line-height: 1; }
+.mini-tally-yes-t { color: #22c55e; }
+.mini-tally-no-t { color: #ef4444; }
 
 .mini-card-empty { opacity: 0.5; }
 
@@ -347,6 +361,24 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
   font-size: 0.68rem; color: var(--text3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+.footer {
+  text-align: center; padding: 1.5rem 1.25rem 1rem;
+  font-size: 0.72rem; color: var(--text3);
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem; flex-wrap: wrap;
+}
+
+.footer-link {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  color: var(--text3); text-decoration: none; font-weight: 500;
+  transition: color 0.15s;
+}
+
+.footer-link:hover { color: var(--primary); }
+
+.footer-icon { width: 16px; height: 16px; fill: currentColor; }
+
+.footer-text { color: var(--text3); }
 
 @media (max-width: 640px) {
   .container { padding: 1rem; }

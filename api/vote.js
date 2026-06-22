@@ -31,6 +31,8 @@ async function koiosPost(url, body, id) {
   return json;
 }
 
+const VALID_CHOICES = ['Yes', 'No', 'Abstain'];
+
 export default async function handler(req, res) {
   const id = reqId();
   log(id, 'start', { method: req.method });
@@ -56,6 +58,10 @@ export default async function handler(req, res) {
 
     if (!address || !payload || !signature || !key || !proposalId || !choice) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!VALID_CHOICES.includes(choice)) {
+      return res.status(400).json({ error: `Invalid choice. Must be one of: ${VALID_CHOICES.join(', ')}` });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -271,7 +277,6 @@ export default async function handler(req, res) {
     const label = isADA ? 'ADA' : 'the required token';
     return res.status(403).json({
       error: `No ${label} balance found for this wallet. You must hold ${label} to vote.`,
-      debug,
     });
   } catch (error) {
     log(id, 'catch', { msg: error.message });

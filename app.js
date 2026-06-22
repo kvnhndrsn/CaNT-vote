@@ -116,6 +116,18 @@ function renderMiniCards() {
     return;
   }
 
+  function miniTally(p) {
+    const summary = p.voteSummary || {};
+    const total = BigInt(p.totalVoteWeight || '0');
+    if (total <= 0n) return '';
+    const yesPct = pctNum(summary.Yes || '0', total.toString());
+    const noPct = pctNum(summary.No || '0', total.toString());
+    const absPct = pctNum(summary.Abstain || '0', total.toString());
+    return `
+      <div class="mini-tally-bar"><div class="mini-tally-seg mini-tally-yes" style="flex:${yesPct}"></div><div class="mini-tally-seg mini-tally-no" style="flex:${noPct}"></div><div class="mini-tally-seg mini-tally-abs" style="flex:${absPct}"></div></div>
+      <div class="mini-tally-pcts"><span class="mini-tally-yes-t">${pctStr(summary.Yes || '0', total.toString())}</span><span class="mini-tally-no-t">${pctStr(summary.No || '0', total.toString())}</span></div>`;
+  }
+
   const withVotes = proposals.filter(p => p.totalVoteWeight && BigInt(p.totalVoteWeight) > 0n);
 
   // 1) Most votes (highest totalVoteWeight)
@@ -126,6 +138,7 @@ function renderMiniCards() {
       <div class="mini-card">
         <span class="mini-label">Most Votes</span>
         <span class="mini-value">${formatWeight(best.totalVoteWeight)}</span>
+        ${miniTally(best)}
         <span class="mini-sub">${escHtml(best.title)}</span>
       </div>`;
   }
@@ -145,6 +158,7 @@ function renderMiniCards() {
         <div class="mini-card">
           <span class="mini-label">Highest Turnout</span>
           <span class="mini-value">${best.pct >= 1 ? best.pct.toFixed(2) : best.pct.toFixed(4)}%</span>
+          ${miniTally(best.p)}
           <span class="mini-sub">${escHtml(best.p.title)}</span>
         </div>`;
     }
@@ -156,6 +170,7 @@ function renderMiniCards() {
     <div class="mini-card">
       <span class="mini-label">Newest</span>
       <span class="mini-value">${escHtml(newest.title)}</span>
+      ${newest.totalVoteWeight && BigInt(newest.totalVoteWeight) > 0n ? miniTally(newest) : ''}
       <span class="mini-sub">${new Date(newest.created_at).toLocaleDateString()}</span>
     </div>`;
 
@@ -307,7 +322,7 @@ function renderProposals() {
     const localLogo = tokenLogo(p.target_policy_id, p.target_fingerprint);
     const imgSrc = p.tokenImage || localLogo;
     const imgHtml = imgSrc
-      ? `<img class="token-thumb" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
+      ? `<img class="token-thumb" src="${escHtml(imgSrc)}" alt="">`
       : '';
 
     const deleteBtn = isCreator
@@ -330,13 +345,13 @@ function renderProposals() {
             <div class="meta">
               <span>${escHtml(assetLabel)}</span>
               <span class="expiry" data-expires="${p.expiresAt}">--</span>
-              <span>by ${shorten(p.creator_address, 6)}</span>
+              <span>by ${escHtml(shorten(p.creator_address, 6))}</span>
             </div>
             <div class="desc">${escHtml(p.description)}</div>
             <div class="extra" style="display:none">
               <div class="meta" style="margin-top:0.3rem">
                 <span>Created ${new Date(p.created_at).toLocaleString()}</span>
-                <span>${shorten(p.creator_address, 20)}</span>
+                <span>${escHtml(shorten(p.creator_address, 20))}</span>
               </div>
             </div>
             ${tallyHtml}
@@ -425,6 +440,31 @@ function escHtml(s) {
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;
+}
+
+function containsProfanity(text) {
+  if (!text || typeof text !== 'string') return false;
+  const words = [
+    'fuck', 'fucking', 'fucked', 'fucker', 'fuckers',
+    'shit', 'shitting', 'shite',
+    'asshole', 'assholes', 'bastard', 'bastards',
+    'bitch', 'bitches', 'bitching',
+    'cocksucker', 'cocksuckers',
+    'dickhead', 'dickheads',
+    'motherfucker', 'motherfuckers', 'motherfucking',
+    'nigger', 'nigga',
+    'faggot', 'faggots',
+    'retard', 'retarded',
+    'cunt', 'cunts',
+    'whore', 'whores',
+    'slut', 'sluts',
+  ];
+  const lower = text.toLowerCase().trim();
+  for (const w of words) {
+    const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    if (re.test(lower)) return true;
+  }
+  return false;
 }
 
 /* ---------- Wallet ---------- */
@@ -516,7 +556,7 @@ function updateWalletUI() {
   const area = $('#walletArea');
   if (state.address) {
     area.innerHTML = `
-      <span class="tooltip" style="margin-right:0.1rem;font-size:0.7rem">${shorten(state.address, 5)}</span>
+      <span class="tooltip" style="margin-right:0.1rem;font-size:0.7rem">${escHtml(shorten(state.address, 5))}</span>
       <button class="btn btn-sm" id="disconnectBtn">Disconnect</button>
     `;
     $('#disconnectBtn').addEventListener('click', disconnectWallet);
@@ -574,7 +614,7 @@ async function openVoteModal(proposalId) {
     const localLogo = tokenLogo(proposal.target_policy_id, proposal.target_fingerprint);
     const imgSrc = proposal.tokenImage || localLogo;
     const imgHtml = imgSrc
-      ? `<img class="token-logo" src="${escHtml(imgSrc)}" alt="" onerror="this.style.display='none'">`
+      ? `<img class="token-logo" src="${escHtml(imgSrc)}" alt="">`
       : '';
 
     $('#voteTokenInfo').innerHTML = `
@@ -741,7 +781,7 @@ function bytesToHex(bytes) {
 
 async function openAuditModal(proposalId) {
   try {
-    const res = await fetch(`/api/audit?proposalId=${proposalId}`);
+    const res = await fetch(`/api/audit?proposalId=${encodeURIComponent(proposalId)}`);
     if (!res.ok) throw new Error('Audit data not found');
     const data = await res.json();
 
@@ -763,10 +803,10 @@ async function openAuditModal(proposalId) {
           <tbody>
             ${data.votes.map(v => `
               <tr>
-                <td>${shorten(v.voter_address, 6)}</td>
+                <td>${escHtml(shorten(v.voter_address, 6))}</td>
                 <td>${escHtml(v.vote_choice)}</td>
                 <td>${formatWeight(v.stake_weight)}</td>
-                <td title="${v.signature_hex}">${shorten(v.signature_hex, 6)}</td>
+                <td title="${escHtml(v.signature_hex)}">${escHtml(shorten(v.signature_hex, 6))}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -849,6 +889,20 @@ async function createProposal() {
 
   if (!title || !description) {
     toast('Fill in title and description', 'error');
+    return;
+  }
+
+  if (title.length > 500) {
+    toast('Title too long (max 500 characters)', 'error');
+    return;
+  }
+  if (description.length > 5000) {
+    toast('Description too long (max 5000 characters)', 'error');
+    return;
+  }
+
+  if (containsProfanity(title) || containsProfanity(description)) {
+    toast('Title or description contains inappropriate language', 'error');
     return;
   }
 
@@ -941,6 +995,12 @@ function initTheme() {
   if (!saved) localStorage.setItem('cnt_vote_theme', theme);
   $('#themeBtn').textContent = theme === 'dark' ? '☀' : '☾';
 }
+
+/* ---------- Utils ---------- */
+
+document.addEventListener('error', (e) => {
+  if (e.target.tagName === 'IMG') e.target.style.display = 'none';
+}, true);
 
 /* ---------- Init ---------- */
 

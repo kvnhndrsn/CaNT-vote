@@ -5,6 +5,7 @@ function log(id, step, data) {
 }
 
 import { createClient } from '@supabase/supabase-js';
+import { containsProfanity } from '../lib/profanity.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -426,6 +427,17 @@ export default async function handler(req, res) {
 
       if (!title || !description || !creatorAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      if (title.length > 500) {
+        return res.status(400).json({ error: 'Title too long (max 500 characters)' });
+      }
+      if (description.length > 5000) {
+        return res.status(400).json({ error: 'Description too long (max 5000 characters)' });
+      }
+
+      if (containsProfanity(title) || containsProfanity(description)) {
+        return res.status(400).json({ error: 'Title or description contains inappropriate language' });
       }
 
       log(pid, 'check-balance', { targetPolicy: targetPolicyId?.slice(0, 16) || 'ADA' });
