@@ -175,8 +175,47 @@ function tokenPriceKey(policyId, assetName) {
 }
 
 
-async function fetchMinswapPools() {
+async function fetchMinswapData() {
   const id = 'mp-' + reqId();
+
+  // Prices from Assets Metrics endpoint (direct price per token)
+  const priceMap = {};
+  try {
+    const resp = await fetch(
+      'https://api-mainnet-prod.minswap.org/v1/assets/metrics',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limit: 100,
+          sort_field: 'liquidity',
+          sort_direction: 'desc',
+          only_verified: false,
+        }),
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+    if (resp.ok) {
+      const json = await resp.json();
+      const metrics = json.asset_metrics || [];
+      log(id, 'assets', { count: metrics.length });
+      for (const m of metrics) {
+        const asset = m.asset || {};
+        const policy = asset.currency_symbol || '';
+        const name = asset.token_name || '';
+        if (policy && m.price != null && m.liquidity != null) {
+          priceMap[tokenPriceKey(policy, name)] = m.price;
+        }
+      }
+    } else {
+      log(id, 'prices-fail', { status: resp.status });
+    }
+  } catch (e) {
+    log(id, 'prices-error', { msg: e.message });
+  }
+
+  // LP pool data from Pools Metrics endpoint
+  const lpMap = {};
   try {
     const resp = await fetch(
       'https://api-mainnet-prod.minswap.org/v1/pools/metrics',
@@ -187,79 +226,24 @@ async function fetchMinswapPools() {
         signal: AbortSignal.timeout(15000),
       }
     );
-    if (!resp.ok) {
-      log(id, 'fetch-fail', { status: resp.status });
-      return { pools: [], priceMap: {}, lpMap: {} };
-    }
-    const json = await resp.json();
-    const poolArr = json.pool_metrics || [];
-    log(id, 'pools', { count: poolArr.length });
-
-    if (poolArr.length > 0) {
-      const p = poolArr[0];
-      log(id, 'pool0', {
-        a_pol: p.asset_a?.currency_symbol,
-        a_name: p.asset_a?.token_name,
-        b_pol: p.asset_b?.currency_symbol,
-        b_name: p.asset_b?.token_name,
-        raw_a: p.liquidity_a_raw,
-        raw_b: p.liquidity_b_raw,
-        val_a: p.liquidity_a,
-        val_b: p.liquidity_b,
-        tvl: p.liquidity,
-        type: p.type,
-      });
-    }
-
-    const priceMap = {};
-    const lpMap = {};
-
-    for (const pool of poolArr) {
-      try {
+    if (resp.ok) {
+      const json = await resp.json();
+      const poolArr = json.pool_metrics || [];
+      log(id, 'pools', { count: poolArr.length });
+      for (const pool of poolArr) {
         const poolId = (pool.lp_asset && pool.lp_asset.token_name) || '';
-        const assetA = pool.asset_a || {};
-        const assetB = pool.asset_b || {};
-        const policyA = assetA.currency_symbol || '';
-        const nameA = assetA.token_name || '';
-        const policyB = assetB.currency_symbol || '';
-        const nameB = assetB.token_name || '';
-        const rawA = pool.liquidity_a_raw || 0;
-        const rawB = pool.liquidity_b_raw || 0;
-        const adaValA = pool.liquidity_a || 0;
-        const adaValB = pool.liquidity_b || 0;
-        const tvlAda = pool.liquidity || 0;
-
-        if (rawA <= 0 || rawB <= 0) continue;
-
-        const keyA = tokenPriceKey(policyA, nameA);
-        const keyB = tokenPriceKey(policyB, nameB);
-        const isAdaA = !policyA;
-        const isAdaB = !policyB;
-
-        if (isAdaB && !isAdaA) {
-          priceMap[keyA] = rawA > 0 ? adaValA / rawA : null;
-        } else if (isAdaA && !isAdaB) {
-          priceMap[keyB] = rawB > 0 ? adaValB / rawB : null;
-        } else if (!isAdaA && !isAdaB) {
-          if (adaValA > 0 && rawA > 0) priceMap[keyA] = adaValA / rawA;
-          if (adaValB > 0 && rawB > 0) priceMap[keyB] = adaValB / rawB;
-        }
-
         if (poolId) {
           const lpKey = (KNOWN_DEX_LP[0].policyId + poolId).toLowerCase();
-          lpMap[lpKey] = { poolId, tvlAda };
+          lpMap[lpKey] = { poolId, tvlAda: pool.liquidity || 0 };
         }
-      } catch (e) {
-        continue;
       }
     }
-
-    log(id, 'prices', { tokens: Object.keys(priceMap).length, lpPools: Object.keys(lpMap).length });
-    return { pools: poolArr, priceMap, lpMap };
   } catch (e) {
-    log(id, 'error', { msg: e.message });
-    return { pools: [], priceMap: {}, lpMap: {} };
+    log(id, 'lp-error', { msg: e.message });
   }
+
+  log(id, 'summary', { prices: Object.keys(priceMap).length, lp: Object.keys(lpMap).length });
+  return { priceMap, lpMap };
 }
 
 function calculateLpValue(lpData, lpBalance, totalLPSupply) {
@@ -301,10 +285,10 @@ export default async function handler(req, res) {
 
     const [adaBalance, { priceMap, lpMap }] = await Promise.all([
       fetchAdaBalance(stakeAddresses, addresses, koiosUrl, id),
-      fetchMinswapPools(),
+      fetchMinswapData(),
     ]);
 
-    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length });
+    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length, priceSample: Object.keys(priceMap).slice(0, 3) });
 
     const adaInAda = Number(adaBalance) / 1e6;
 
