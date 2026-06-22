@@ -1030,6 +1030,30 @@ function generatePieHtml(slices) {
   const total = slices.reduce((s, sl) => s + sl.value, 0);
   if (total <= 0) return '';
 
+  const centerText = total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const formatAda = (v) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  if (slices.length === 1) {
+    const s = slices[0];
+    return `
+      <div class="pf-chart-wrap">
+        <svg viewBox="0 0 200 200" class="pf-chart-svg">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}"/>
+          <circle cx="${cx}" cy="${cy}" r="52" fill="var(--surface)" stroke="none"/>
+          <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700">${centerText}</text>
+          <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text3)" font-size="11" font-weight="500">ADA</text>
+        </svg>
+        <div class="pf-chart-legend">
+          <div class="pf-chart-legend-item">
+            <span class="pf-chart-swatch" style="background:${s.color}"></span>
+            <span class="pf-chart-legend-label">${escHtml(s.label)}</span>
+            <span class="pf-chart-legend-pct">100.0%</span>
+            <span class="pf-chart-legend-ada">${formatAda(s.value)} ADA</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
   let angle = 0;
   const paths = [];
   const legendItems = [];
@@ -1044,7 +1068,7 @@ function generatePieHtml(slices) {
       color: slices[i].color,
       label: slices[i].label,
       pct: (pct * 100).toFixed(1),
-      ada: slices[i].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      ada: formatAda(slices[i].value),
     });
     angle = endAngle;
   }
@@ -1065,7 +1089,7 @@ function generatePieHtml(slices) {
       <svg viewBox="0 0 200 200" class="pf-chart-svg">
         ${pathHtml}
         <circle cx="${cx}" cy="${cy}" r="52" fill="var(--surface)" stroke="none"/>
-        <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700">${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</text>
+        <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700">${centerText}</text>
         <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text3)" font-size="11" font-weight="500">ADA</text>
       </svg>
       <div class="pf-chart-legend">${legendHtml}</div>
@@ -1120,6 +1144,9 @@ function renderPortfolio(data) {
     }
   }
 
+  const chartHtml = generatePieHtml(slices);
+  console.log('[pf] chartHtml length:', chartHtml.length, 'slices:', slices.length, 'ada:', ada);
+
   let html = '';
 
   if (data.netWorthAda != null) {
@@ -1131,7 +1158,7 @@ function renderPortfolio(data) {
       </div>`;
   }
 
-  html += '<div class="pf-chart-card">' + generatePieHtml(slices) + '</div>';
+  html += '<div class="pf-chart-card">' + chartHtml + '</div>';
 
   html += `
     <div class="pf-card pf-ada">
