@@ -170,33 +170,31 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
     if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
       const result = await koiosPost(`${koiosUrl}/account_assets`, { _stake_addresses: stakeAddresses });
       if (Array.isArray(result)) {
-        for (const acct of result) {
-          if (Array.isArray(acct.asset_list)) {
-            for (const asset of acct.asset_list) {
-              const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
-              log(id, 'token-stake-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
-              if (match) totalBalance += BigInt(asset.quantity || '0');
-            }
-          }
+        log(id, 'token-stake-raw', { count: result.length, sample: result.slice(0, 3).map(a => ({ policy: a.policy_id?.slice(0, 12) + '...', name: a.asset_name || '(empty)', qty: a.quantity })) });
+        for (const asset of result) {
+          const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+          log(id, 'token-stake-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
+          if (match) totalBalance += BigInt(asset.quantity || '0');
         }
       } else {
         log(id, 'token-stake-null', { result });
       }
     }
+    const BATCH_SIZE = 50;
     if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
-      const result = await koiosPost(`${koiosUrl}/address_assets`, { _addresses: addresses });
-      if (Array.isArray(result)) {
-        for (const entry of result) {
-          if (Array.isArray(entry.asset_list)) {
-            for (const asset of entry.asset_list) {
-              const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
-              log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
-              if (match) totalBalance += BigInt(asset.quantity || '0');
-            }
+      for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+        const batch = addresses.slice(i, i + BATCH_SIZE);
+        const result = await koiosPost(`${koiosUrl}/address_assets`, { _addresses: batch });
+        if (Array.isArray(result)) {
+          log(id, 'token-addr-batch', { batchIdx: i / BATCH_SIZE, count: result.length, sample: result.slice(0, 3).map(a => ({ addr: a.address?.slice(0, 12) + '...', policy: a.policy_id?.slice(0, 12) + '...', name: a.asset_name || '(empty)', qty: a.quantity })) });
+          for (const asset of result) {
+            const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+            log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
+            if (match) totalBalance += BigInt(asset.quantity || '0');
           }
+        } else {
+          log(id, 'token-addr-batch-null', { batchIdx: i / BATCH_SIZE, result });
         }
-      } else {
-        log(id, 'token-addr-null', { result });
       }
     }
   }
