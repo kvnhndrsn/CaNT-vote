@@ -86,7 +86,7 @@ async function fetchAssetMeta(policyId, assetName) {
   const id = 'meta-' + reqId();
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
-  let name = null, image = null;
+  let name = null, image = null, totalSupply = null;
   try {
     const result = await koiosPost(`${koiosUrl}/asset_info`, {
       _asset_policy: policyId,
@@ -97,6 +97,7 @@ async function fetchAssetMeta(policyId, assetName) {
       const meta = extractAssetMeta(info.minting_tx_metadata);
       name = meta.name;
       image = meta.image;
+      if (info.total_supply) totalSupply = info.total_supply;
     }
   } catch (e) {
     log(id, 'error', { msg: e.message });
@@ -111,7 +112,7 @@ async function fetchAssetMeta(policyId, assetName) {
       if (!image) image = reg.logo;
     }
   }
-  return { name, image, ticker, decimals };
+  return { name, image, ticker, decimals, totalSupply };
 }
 
 const KNOWN_DEX_LP = [
@@ -173,42 +174,30 @@ function tokenPriceKey(policyId, assetName) {
   return ((policyId || '') + (assetName || '')).toLowerCase();
 }
 
-function parsePoolAsset(assetField) {
-  if (!assetField || typeof assetField === 'string') {
-    const str = assetField || '';
-    if (str === 'lovelace' || str === '') return { policyId: null, assetName: null };
-    const assetId = str.replace(/^0x/, '');
-    if (assetId.length >= 56) {
-      return { policyId: assetId.slice(0, 56), assetName: assetId.slice(56) || '' };
-    }
-    return { policyId: assetId, assetName: '' };
-  }
-  if (typeof assetField === 'object') {
-    const policyId = assetField.policyId || assetField.policy_id || null;
-    const assetName = assetField.assetName || assetField.asset_name || assetField.name || '';
-    return { policyId: policyId || null, assetName: assetName || '' };
-  }
-  return { policyId: null, assetName: null };
-}
 
 async function fetchMinswapPools() {
   const id = 'mp-' + reqId();
   try {
     const resp = await fetch(
-      'https://api.minswap.org/v2/pools?page=1&pageSize=1000',
-      { signal: AbortSignal.timeout(15000) }
+      'https://api-mainnet-prod.minswap.org/v1/pools/metrics',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 1000 }),
+        signal: AbortSignal.timeout(15000),
+      }
     );
     if (!resp.ok) {
       log(id, 'fetch-fail', { status: resp.status });
-      return { pools: [], lpMap: {} };
+      return { pools: [], priceMap: {}, lpMap: {} };
     }
     const json = await resp.json();
-    const poolArr = Array.isArray(json) ? json : (json.pools || json.data || []);
+    const poolArr = json.pool_metrics || json.pools || json.data || [];
     log(id, 'pools', { count: poolArr.length });
 
     if (poolArr.length > 0) {
       const first = poolArr[0];
-      log(id, 'pool-sample', { keys: Object.keys(first), id: first.id || first.poolId || '(missing)' });
+      log(id, 'pool-sample', { keys: Object.keys(first), type: first.type, id: (first.lp_asset || {}).token_name });
     }
 
     const priceMap = {};
@@ -216,39 +205,40 @@ async function fetchMinswapPools() {
 
     for (const pool of poolArr) {
       try {
-        const poolId = pool.id || pool.poolId || pool.pool_id || '';
-        const assetA = parsePoolAsset(pool.assetA || pool.assetAIn || pool.asset_a);
-        const assetB = parsePoolAsset(pool.assetB || pool.assetBIn || pool.asset_b);
-        const reserveA = pool.reserveA || pool.reserveAIn || pool.reserve_a || '0';
-        const reserveB = pool.reserveB || pool.reserveBIn || pool.reserve_b || '0';
-        const totalLP = pool.totalLPSupply || pool.total_lp_supply || pool.totalLiquidity || '0';
+        const poolId = (pool.lp_asset && pool.lp_asset.token_name) || '';
+        const assetA = pool.asset_a || {};
+        const assetB = pool.asset_b || {};
+        const policyA = assetA.currency_symbol || '';
+        const nameA = assetA.token_name || '';
+        const policyB = assetB.currency_symbol || '';
+        const nameB = assetB.token_name || '';
+        const reserveA = pool.liquidity_a || 0;
+        const reserveB = pool.liquidity_b || 0;
+        const adaValA = pool.liquidity_a_currency || 0;
+        const adaValB = pool.liquidity_b_currency || 0;
+        const tvlAda = pool.liquidity_currency || 0;
 
-        const ra = BigInt(reserveA);
-        const rb = BigInt(reserveB);
-        const tl = BigInt(totalLP);
-        if (ra <= 0n || rb <= 0n || tl <= 0n) continue;
+        if (reserveA <= 0 || reserveB <= 0) continue;
 
-        const keyA = tokenPriceKey(assetA.policyId, assetA.assetName);
-        const keyB = tokenPriceKey(assetB.policyId, assetB.assetName);
-        const isAdaA = !assetA.policyId;
-        const isAdaB = !assetB.policyId;
+        const keyA = tokenPriceKey(policyA, nameA);
+        const keyB = tokenPriceKey(policyB, nameB);
+        const isAdaA = !policyA;
+        const isAdaB = !policyB;
 
         if (isAdaB && !isAdaA) {
-          priceMap[keyA] = (Number(ra) / 1e6) / (Number(rb) / 1e6);
+          priceMap[keyA] = reserveB > 0 ? adaValB / reserveB : null;
         } else if (isAdaA && !isAdaB) {
-          priceMap[keyB] = (Number(rb) / 1e6) / (Number(ra) / 1e6);
+          priceMap[keyB] = reserveA > 0 ? adaValA / reserveA : null;
+        } else if (!isAdaA && !isAdaB) {
+          if (adaValA > 0 && reserveA > 0) priceMap[keyA] = adaValA / reserveA;
+          if (adaValB > 0 && reserveB > 0) priceMap[keyB] = adaValB / reserveB;
         }
 
         if (poolId) {
           const lpKey = (KNOWN_DEX_LP[0].policyId + poolId).toLowerCase();
           lpMap[lpKey] = {
             poolId,
-            assetA, assetB,
-            reserveA: ra.toString(),
-            reserveB: rb.toString(),
-            totalLPSupply: tl.toString(),
-            priceA: priceMap[keyA] || null,
-            priceB: priceMap[keyB] || null,
+            tvlAda,
           };
         }
       } catch (e) {
@@ -264,23 +254,20 @@ async function fetchMinswapPools() {
   }
 }
 
-function calculateLpValue(lpData, lpBalance, lpDecimals) {
+function calculateLpValue(lpData, lpBalance, totalLPSupply) {
   if (!lpData) return null;
-  try {
-    const totalLP = BigInt(lpData.totalLPSupply);
-    if (totalLP <= 0n) return null;
-    const lpShare = Number(BigInt(lpBalance)) / Number(totalLP);
-
-    const rA = Number(BigInt(lpData.reserveA)) / 1e6;
-    const rB = Number(BigInt(lpData.reserveB)) / 1e6;
-
-    const valA = lpData.priceA != null ? rA * lpData.priceA : rA;
-    const valB = lpData.priceB != null ? rB * lpData.priceB : rB;
-
-    return lpShare * (valA + valB);
-  } catch {
-    return null;
+  if (totalLPSupply && BigInt(totalLPSupply) > 0n) {
+    try {
+      const totalLP = BigInt(totalLPSupply);
+      const tvl = lpData.tvlAda || 0;
+      if (totalLP <= 0n || tvl <= 0) return null;
+      const lpShare = Number(BigInt(lpBalance)) / Number(totalLP);
+      return lpShare * tvl;
+    } catch {
+      return null;
+    }
   }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -373,7 +360,7 @@ export default async function handler(req, res) {
           let lpValue = null;
           if (lpInfo.dex === 'Minswap V2') {
             const lpData = lpMap[lpInfo.poolKey] || null;
-            lpValue = calculateLpValue(lpData, e.quantity, decimals);
+            lpValue = calculateLpValue(lpData, e.quantity, meta.totalSupply);
           }
           token.lpInfo = lpInfo;
           token.lpValueAda = lpValue;
