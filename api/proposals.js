@@ -294,6 +294,17 @@ export default async function handler(req, res) {
           formattedTally[choice] = weight.toString();
         }
 
+        let myVote = null;
+        if (req.query.voter) {
+          const { data: myVoteData } = await supabase
+            .from('votes')
+            .select('vote_choice, stake_weight')
+            .eq('proposal_id', req.query.id)
+            .eq('voter_address', req.query.voter)
+            .maybeSingle();
+          if (myVoteData) myVote = myVoteData;
+        }
+
         const assetId = formatAssetId(proposal);
         const assetInfo = assetId
           ? await fetchAssetInfo(proposal.target_policy_id, proposal.target_asset_name)
@@ -304,6 +315,7 @@ export default async function handler(req, res) {
           voterCount: votes.length,
           totalWeight: totalWeight.toString(),
           tally: formattedTally,
+          myVote,
           circulatingSupply: assetInfo?.supply || null,
           tokenName: assetInfo?.name || null,
           tokenImage: assetInfo?.image || null,

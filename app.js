@@ -3,14 +3,14 @@ import { bech32 } from 'bech32';
 console.log('[app] module loaded');
 
 const WALLET_LOGOS = {
-  eternl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b6bf5"/><rect x="10" y="9" width="5" height="14" rx="1" fill="white" opacity=".9"/><rect x="17" y="9" width="5" height="14" rx="1" fill="white" opacity=".6"/></svg>'),
-  nami: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><path d="M10 16c3-4 6-5 8-3s3 4 4 3-2-5-5-7-5 0-7 7z" fill="white" opacity=".85"/></svg>'),
-  lace: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ff6b35"/><path d="M16 8c-2 4-6 6-6 11 0 3 2 5 6 5s6-2 6-5c0-5-4-7-6-11z" fill="white" opacity=".85"/><circle cx="16" cy="16" r="3" fill="white" opacity=".95"/></svg>'),
-  flint: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#00b4d8"/><path d="M16 7l3 6 6 1-5 5 1 7-6-4-6 4 1-7-5-5 6-1z" fill="white" opacity=".8"/></svg>'),
-  gerowallet: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#7c3aed"/><circle cx="16" cy="14" r="4" fill="white" opacity=".9"/><ellipse cx="16" cy="22" rx="5" ry="3" fill="white" opacity=".7"/></svg>'),
-  typhoncip30: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#10b981"/><path d="M12 10h8l-2 6h3l-5 10 2-8h-4z" fill="white" opacity=".9"/></svg>'),
-  vespr: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f43f5e"/><path d="M16 8v16M8 16h16" stroke="white" stroke-width="3" stroke-linecap="round" opacity=".85"/></svg>'),
-  begin: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M12 22V10l4 8 4-8v12" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>'),
+  eternl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b6bf5"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">E</text></svg>'),
+  nami: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">N</text></svg>'),
+  lace: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ff6b35"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">L</text></svg>'),
+  flint: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#00b4d8"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">F</text></svg>'),
+  gerowallet: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#7c3aed"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">G</text></svg>'),
+  typhoncip30: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#10b981"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">T</text></svg>'),
+  vespr: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f43f5e"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">V</text></svg>'),
+  begin: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">B</text></svg>'),
 };
 
 const KNOWN_WALLETS = [
@@ -25,7 +25,7 @@ const KNOWN_WALLETS = [
 ];
 
 const TOKEN_LOGOS = {
-  ADA: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#4a8cff"/><text x="16" y="22" font-size="17" text-anchor="middle" fill="white" font-weight="bold">ADA</text></svg>'),
+  ADA: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#4a8cff"/><path d="M16 9l4 10-4 3-4-3z" fill="none" stroke="white" stroke-width="2" stroke-linejoin="round" opacity=".9"/><circle cx="16" cy="19" r="1.5" fill="white" opacity=".9"/></svg>'),
   SNEK: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#22c55e"/><path d="M10 20c2-4 4-6 6-6s4 3 6 3-2 4-4 4-6-2-8-1z" fill="white" opacity=".9"/><circle cx="12" cy="13" r="1.5" fill="white"/><circle cx="20" cy="13" r="1.5" fill="white"/></svg>'),
   NIGHT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M20 8c-5 0-9 4-9 9s4 9 9 9c-3 0-6-3-6-6s3-6 6-6z" fill="white" opacity=".9"/><circle cx="23" cy="11" r="1.2" fill="white" opacity=".7"/><circle cx="25" cy="16" r=".8" fill="white" opacity=".5"/></svg>'),
   WMTX: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b82f6"/><circle cx="16" cy="16" r="6" fill="none" stroke="white" stroke-width="1.5" opacity=".9"/><path d="M10 10l3 3M22 10l-3 3M10 22l3-3M22 22l-3-3" stroke="white" stroke-width="1.5" opacity=".6"/><circle cx="16" cy="10" r="1" fill="white"/><circle cx="16" cy="22" r="1" fill="white"/><circle cx="10" cy="16" r="1" fill="white"/><circle cx="22" cy="16" r="1" fill="white"/></svg>'),
@@ -204,12 +204,13 @@ function renderProposals() {
         ? BigInt(p.circulatingSupply)
         : isADA ? 45_000_000_000_000_000n : null;
       const pct = supply ? supplyPct(total.toString(), supply.toString()) : null;
+      const unit = isADA ? 'lovelace' : p.tokenName || (p.target_asset_name || '');
       tallyHtml = `
         <div class="card-tally">
           <div class="card-tally-row">
             ${pieSvg(choices, total.toString())}
-            <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${pctStr(w, total.toString())}`).join(' · ')}</span>
-            <span class="card-tally-pct">${formatWeight(total.toString())}${pct ? ` · ${pct}` : ''}</span>
+            <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${formatWeight(w)} ${escHtml(unit)} (${pctStr(w, total.toString())})`).join(' · ')}</span>
+            <span class="card-tally-pct">${formatWeight(total.toString())} ${escHtml(unit)}${pct ? ` · ${pct}` : ''}</span>
           </div>
         </div>
       `;
@@ -452,7 +453,7 @@ async function openVoteModal(proposalId) {
   }
 
   try {
-    const res = await fetch(`/api/proposals?id=${proposalId}`);
+    const res = await fetch(`/api/proposals?id=${proposalId}&voter=${encodeURIComponent(state.address)}`);
     if (!res.ok) throw new Error('Proposal not found');
     const proposal = await res.json();
     state.currentProposal = proposal;
@@ -472,6 +473,8 @@ async function openVoteModal(proposalId) {
     const supplyInfo = supply
       ? `Supply: ${formatWeight(supply.toString())}`
       : '';
+    const unitLabel = isADA ? 'lovelace' : tokenLabel;
+
     const localLogo = tokenLogo(proposal.target_policy_id);
     const imgSrc = proposal.tokenImage || localLogo;
     const imgHtml = imgSrc
@@ -487,19 +490,22 @@ async function openVoteModal(proposalId) {
     const tally = proposal.tally || {};
     const tallyTotal = BigInt(proposal.totalWeight || 0);
 
+    const myChoice = proposal.myVote?.vote_choice;
+
     optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
+      const isMyVote = c === myChoice;
       const weight = tally[c];
       const pct = weight && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
       const supplyPct = weight && supply && supply > 0n
         ? ' (' + (Number(BigInt(weight)) / Number(supply) * 100).toFixed(2) + '% of supply)'
         : '';
       const label = weight
-        ? `${escHtml(c)}: ${formatWeight(weight)} (${pct.toFixed(1)}%)${supplyPct}`
+        ? `${escHtml(c)}: ${formatWeight(weight)} ${escHtml(unitLabel)} (${pct.toFixed(1)}%)${supplyPct}`
         : escHtml(c);
       return `
-        <label class="vote-option" data-choice="${escHtml(c)}">
-          <input type="radio" name="voteChoice" value="${escHtml(c)}">
-          <span>${label}</span>
+        <label class="vote-option${isMyVote ? ' selected' : ''}" data-choice="${escHtml(c)}">
+          <input type="radio" name="voteChoice" value="${escHtml(c)}"${isMyVote ? ' checked' : ''}>
+          <span>${label}${isMyVote ? ' <span class="my-vote-badge">your vote</span>' : ''}</span>
         </label>
       `;
     }).join('');
@@ -680,53 +686,14 @@ async function openAuditModal(proposalId) {
 
 /* ---------- Create Proposal ---------- */
 
-const TOKEN_SELECT_ITEMS = [
-  { label: 'ADA', value: '', logo: TOKEN_LOGOS.ADA },
-  ...CURATED_TOKENS.map(t => ({ label: t.label, value: t.label, logo: t.logo })),
-  { label: 'Custom', value: 'custom', logo: null },
-];
-
-function populateTokenSelector() {
-  const c = $('#propTokenSelector');
-  c.innerHTML = TOKEN_SELECT_ITEMS.map(t => `
-    <label class="token-option" data-value="${t.value}">
-      <input type="radio" name="propToken" value="${t.value}">
-      ${t.logo ? `<img class="token-logo" src="${t.logo}" alt="">` : ''}
-      <span>${t.label}</span>
-    </label>
-  `).join('');
-  c.querySelectorAll('.token-option').forEach(el => {
-    el.addEventListener('click', () => {
-      c.querySelectorAll('.token-option').forEach(o => o.classList.remove('selected'));
-      el.classList.add('selected');
-      el.querySelector('input').checked = true;
-      const val = el.dataset.value;
-      if (!val) {
-        $('#propCustomGroup').style.display = 'none';
-        $('#propAssetGroup').style.display = 'none';
-        $('#propPolicy').value = '';
-        $('#propAsset').value = '';
-      } else if (val === 'custom') {
-        $('#propCustomGroup').style.display = '';
-        $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
-        $('#propPolicy').value = '';
-        $('#propAsset').value = '';
-      } else {
-        const token = CURATED_TOKENS.find(t => t.label === val);
-        if (token) {
-          $('#propCustomGroup').style.display = '';
-          $('#propAssetGroup').style.display = token.asset ? '' : 'none';
-          $('#propPolicy').value = token.policy;
-          $('#propAsset').value = token.asset || '';
-        }
-      }
-    });
-  });
-}
-
 $('#createBtn').addEventListener('click', () => {
   if (!state.api) { toast('Connect wallet first', 'error'); return; }
-  populateTokenSelector();
+
+  const sel = $('#propTokenSelect');
+  sel.innerHTML = '<option value="">ADA</option>' +
+    CURATED_TOKENS.map(t => `<option value="${t.label}">${t.label}</option>`).join('') +
+    '<option value="custom">— Custom token —</option>';
+  sel.value = '';
   $('#propCustomGroup').style.display = 'none';
   $('#propAssetGroup').style.display = 'none';
   $('#propPolicy').value = '';
@@ -734,9 +701,31 @@ $('#createBtn').addEventListener('click', () => {
   $('#createModal').classList.add('open');
 });
 
+$('#propTokenSelect').addEventListener('change', () => {
+  const val = $('#propTokenSelect').value;
+  if (!val) {
+    $('#propCustomGroup').style.display = 'none';
+    $('#propAssetGroup').style.display = 'none';
+    $('#propPolicy').value = '';
+    $('#propAsset').value = '';
+  } else if (val === 'custom') {
+    $('#propCustomGroup').style.display = '';
+    $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
+    $('#propPolicy').value = '';
+    $('#propAsset').value = '';
+  } else {
+    const token = CURATED_TOKENS.find(t => t.label === val);
+    if (token) {
+      $('#propCustomGroup').style.display = '';
+      $('#propAssetGroup').style.display = token.asset ? '' : 'none';
+      $('#propPolicy').value = token.policy;
+      $('#propAsset').value = token.asset || '';
+    }
+  }
+});
+
 $('#propPolicy').addEventListener('input', () => {
-  const sel = $('#propTokenSelector').querySelector('.token-option.selected');
-  if (sel && sel.dataset.value === 'custom') {
+  if ($('#propTokenSelect').value === 'custom') {
     $('#propAssetGroup').style.display = $('#propPolicy').value.trim() ? '' : 'none';
   }
 });
@@ -746,8 +735,7 @@ $('#createSubmitBtn').addEventListener('click', createProposal);
 async function createProposal() {
   const title = $('#propTitle').value.trim();
   const description = $('#propDesc').value.trim();
-  const selected = $('#propTokenSelector').querySelector('.token-option.selected');
-  const tokenVal = selected ? selected.dataset.value : '';
+  const tokenVal = $('#propTokenSelect').value;
   const policy = $('#propPolicy').value.trim();
   const asset = $('#propAsset').value.trim();
 
