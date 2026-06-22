@@ -22,6 +22,10 @@
 </header>
 
 <main class="container">
+  <div class="tabs">
+    <button class="tab tab-active" data-view="proposals">Proposals</button>
+    <button class="tab" data-view="portfolio">Portfolio</button>
+  </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
     <div class="section-title">
@@ -30,6 +34,10 @@
     </div>
     <div id="tokenFilter"></div>
     <div id="proposalList"></div>
+  </div>
+  <div id="portfolioView" style="display:none">
+    <div class="section-title">Portfolio</div>
+    <div id="portfolioContent"></div>
   </div>
 </main>
 

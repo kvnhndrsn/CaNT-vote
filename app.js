@@ -576,6 +576,9 @@ function disconnectWallet() {
   state.stakeAddresses = [];
   state.hexAddress = null;
   updateWalletUI();
+  if ($('#portfolioView').style.display !== 'none') {
+    $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
+  }
   toast('Disconnected');
 }
 
@@ -1001,6 +1004,87 @@ function initTheme() {
 document.addEventListener('error', (e) => {
   if (e.target.tagName === 'IMG') e.target.style.display = 'none';
 }, true);
+
+/* ---------- Portfolio ---------- */
+
+async function fetchPortfolio() {
+  const container = $('#portfolioContent');
+  container.innerHTML = '<div class="empty-state"><p>Loading portfolio...</p></div>';
+  try {
+    const res = await fetch('/api/portfolio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        addresses: state.addresses,
+        stakeAddresses: state.stakeAddresses,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    renderPortfolio(data);
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><strong>Could not load portfolio</strong><p>${escHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderPortfolio(data) {
+  const container = $('#portfolioContent');
+  const ada = Number(data.adaBalance) / 1_000_000;
+
+  let html = `
+    <div class="pf-card pf-ada">
+      <div class="pf-card-header">
+        <img class="pf-logo" src="/img/cardano-starburst.svg" alt="">
+        <span class="pf-name">ADA</span>
+        <span class="pf-balance">${ada.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
+      </div>
+    </div>`;
+
+  if (data.tokens.length === 0) {
+    html += '<div class="empty-state" style="margin-top:0.75rem"><p>No native tokens found.</p></div>';
+  } else {
+    html += '<div class="pf-token-list">';
+    for (const t of data.tokens) {
+      const label = t.ticker || t.name || (t.fingerprint ? shorten(t.fingerprint, 5) : shorten(t.policyId, 5));
+      const imgSrc = t.image || (() => {
+        const curated = CURATED_TOKENS.find(c => c.fingerprint === t.fingerprint || c.policy === t.policyId);
+        return curated ? curated.logo : null;
+      })();
+      const imgHtml = imgSrc ? `<img class="pf-logo" src="${escHtml(imgSrc)}" alt="">` : '<div class="pf-logo pf-logo-placeholder"></div>';
+      html += `
+        <div class="pf-card">
+          <div class="pf-card-header">
+            ${imgHtml}
+            <span class="pf-name">${escHtml(label)}</span>
+            <span class="pf-balance">${escHtml(t.displayQty)}</span>
+          </div>
+          <div class="pf-sub">${escHtml(shorten(t.fingerprint || t.policyId, 6))}</div>
+        </div>`;
+    }
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+/* ---------- Tab switching ---------- */
+
+$$('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.tab').forEach(t => t.classList.remove('tab-active'));
+    tab.classList.add('tab-active');
+    const view = tab.dataset.view;
+    $('#mainView').style.display = view === 'proposals' ? '' : 'none';
+    $('#portfolioView').style.display = view === 'portfolio' ? '' : 'none';
+    if (view === 'portfolio') {
+      if (!state.api) {
+        $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
+      } else {
+        fetchPortfolio();
+      }
+    }
+  });
+});
 
 /* ---------- Init ---------- */
 
