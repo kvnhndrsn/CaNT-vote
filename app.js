@@ -142,27 +142,30 @@ function renderFilter() {
   });
 }
 
-function pieSvg(choices, total) {
+function pieSvg(summary, total) {
   if (!total || total === '0') return '';
   const t = Number(total);
   const colors = ['#22c55e', '#ef4444', '#a1a1aa'];
+  const r = 10, cx = 12, cy = 12;
+  const allChoices = ['Yes', 'No', 'Abstain'];
   let accum = 0;
   let paths = '';
-  choices.forEach(([, weight], i) => {
-    const pct = Number(weight) / t;
+  allChoices.forEach((choice, i) => {
+    const weight = summary[choice];
+    const pct = weight ? Number(weight) / t : 0;
     if (pct === 0) return;
     const a1 = accum * 360;
     const a2 = (accum + pct) * 360;
     accum += pct;
-    const r = 8, cx = 12, cy = 12;
     const x1 = cx + r * Math.sin(a1 * Math.PI / 180);
     const y1 = cy - r * Math.cos(a1 * Math.PI / 180);
     const x2 = cx + r * Math.sin(a2 * Math.PI / 180);
     const y2 = cy - r * Math.cos(a2 * Math.PI / 180);
     const large = pct > 0.5 ? 1 : 0;
-    paths += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${colors[i % colors.length]}"/>`;
+    paths += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${colors[i]}"/>`;
   });
-  return `<svg width="16" height="16" viewBox="0 0 24 24" style="flex-shrink:0">${paths}</svg>`;
+  if (accum < 1) paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="2 2"/>`;
+  return `<svg width="40" height="40" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--surface2)"/>${paths}</svg>`;
 }
 
 function renderProposals() {
@@ -195,7 +198,10 @@ function renderProposals() {
     function supplyPct(totalStr, supplyStr) {
       const t = Number(totalStr), s = Number(supplyStr);
       if (!s || s <= 0) return '';
-      return ((t / s) * 100).toFixed(2) + '%';
+      const pct = (t / s) * 100;
+      if (pct >= 1) return pct.toFixed(2) + '%';
+      if (pct >= 0.01) return pct.toFixed(4) + '%';
+      return pct.toFixed(6) + '%';
     }
 
     let tallyHtml = '';
@@ -209,13 +215,29 @@ function renderProposals() {
       if (totalPct) pctParts.push(totalPct + ' of total');
       if (circPct) pctParts.push(circPct + ' of circ');
       const pctStr2 = pctParts.length > 0 ? ' · ' + pctParts.join(' · ') : '';
+
+      const barColors = { Yes: '#22c55e', No: '#ef4444', Abstain: '#52525b' };
+      const yesPct = pctNum(summary.Yes || '0', total.toString());
+      const noPct = pctNum(summary.No || '0', total.toString());
+      const absPct = pctNum(summary.Abstain || '0', total.toString());
+      const bar = `
+        <div class="tally-bar">
+          <div class="tally-bar-seg" style="flex:${yesPct};background:#22c55e" title="Yes ${yesPct.toFixed(1)}%"></div>
+          <div class="tally-bar-seg" style="flex:${noPct};background:#ef4444" title="No ${noPct.toFixed(1)}%"></div>
+          <div class="tally-bar-seg" style="flex:${absPct};background:#52525b" title="Abstain ${absPct.toFixed(1)}%"></div>
+        </div>`;
+
+      const lines = [];
+      for (const c of ['Yes', 'No', 'Abstain']) {
+        const w = summary[c] || '0';
+        lines.push(`<span class="tally-line"><span class="tally-dot" style="background:${barColors[c]}"></span><strong>${pctStr(w, total.toString())}</strong> ${escHtml(c)} <span class="tally-w">${formatWeight(w)}</span></span>`);
+      }
+
       tallyHtml = `
         <div class="card-tally">
-          <div class="card-tally-row">
-            ${pieSvg(choices, total.toString())}
-            <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${formatWeight(w)} ${escHtml(unit)} (${pctStr(w, total.toString())})`).join(' · ')}</span>
-            <span class="card-tally-pct">${formatWeight(total.toString())} ${escHtml(unit)}${pctStr2}</span>
-          </div>
+          ${bar}
+          <div class="tally-lines">${lines.join('')}</div>
+          <div class="tally-total">${formatWeight(total.toString())} ${escHtml(unit)}${pctStr2}</div>
         </div>
       `;
     }
@@ -497,7 +519,10 @@ async function openVoteModal(proposalId) {
 
     function choiceSupplyPct(w, s) {
       if (!s || s <= 0n) return '';
-      return (Number(BigInt(w)) / Number(s) * 100).toFixed(2) + '%';
+      const pct = Number(BigInt(w)) / Number(s) * 100;
+      if (pct >= 1) return pct.toFixed(2) + '%';
+      if (pct >= 0.01) return pct.toFixed(4) + '%';
+      return pct.toFixed(6) + '%';
     }
 
     optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
