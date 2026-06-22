@@ -13,14 +13,22 @@ function defaultKoiosUrl(network) {
   }
 }
 
-async function koiosPost(url, body) {
+async function koiosPost(url, body, id) {
+  log(id, 'koios-req', { url: url.slice(0, 60) + '..', bodyKeys: Object.keys(body), bodyPreview: JSON.stringify(body).slice(0, 120) });
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!resp.ok) return null;
-  return resp.json();
+  log(id, 'koios-resp', { status: resp.status, ok: resp.ok, statusText: resp.statusText });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    log(id, 'koios-err-body', { text: text.slice(0, 300) });
+    return null;
+  }
+  const json = await resp.json();
+  log(id, 'koios-data', { isArray: Array.isArray(json), length: Array.isArray(json) ? json.length : typeof json, preview: JSON.stringify(json).slice(0, 200) });
+  return json;
 }
 
 export default async function handler(req, res) {
@@ -34,6 +42,7 @@ export default async function handler(req, res) {
     const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
     const NETWORK = process.env.BLOCKFROST_NETWORK || 'mainnet';
     const KOIOS_URL = process.env.KOIOS_API_URL || defaultKoiosUrl(NETWORK);
+    const debug = { network: NETWORK, koiosUrl: KOIOS_URL, steps: [] };
 
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       return res.status(500).json({ error: 'Supabase not configured' });
@@ -61,31 +70,47 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Proposal not found' });
     }
 
-    log(id, 'proposal-found', { block: proposal.snapshot_block, policy: proposal.target_policy_id });
+    log(id, 'proposal-found', { block: proposal.snapshot_block, policy: proposal.target_policy_id, asset: proposal.target_asset_name });
+    debug.proposal = { block: proposal.snapshot_block, policy: proposal.target_policy_id, asset: proposal.target_asset_name };
 
     let addrsToCheck = Array.isArray(addresses) && addresses.length > 0 ? [...addresses] : [address];
+    log(id, 'addrs-initial', { count: addrsToCheck.length, samples: addrsToCheck.slice(0, 2).map(a => a.slice(0, 15) + '...') });
+    debug.initialAddresses = addrsToCheck.length;
+    debug.addressSamples = addrsToCheck.slice(0, 2).map(a => a.slice(0, 20) + '...');
 
     if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
+      log(id, 'stake-addrs', { count: stakeAddresses.length, samples: stakeAddresses.map(s => s.slice(0, 15) + '...') });
+      debug.stakeAddresses = stakeAddresses.map(s => s.slice(0, 20) + '...');
       try {
-        const result = await koiosPost(`${KOIOS_URL}/account_addresses`, {
-          _stake_addresses: stakeAddresses,
-        });
+        const result = await koiosPost(`${KOIOS_URL}/account_addresses`, { _stake_addresses: stakeAddresses }, id);
         if (Array.isArray(result)) {
           const existing = new Set(addrsToCheck);
+          let discovered = 0;
           for (const account of result) {
             if (Array.isArray(account.addresses)) {
               for (const addr of account.addresses) {
                 if (!existing.has(addr)) {
                   addrsToCheck.push(addr);
                   existing.add(addr);
+                  discovered++;
                 }
               }
             }
           }
+          log(id, 'koios-discovered', { count: discovered, total: addrsToCheck.length });
+          debug.koiosDiscovered = discovered;
+        } else {
+          log(id, 'koios-discover-skip', { msg: 'result was not an array', resultType: typeof result, result });
+          debug.koiosDiscoverFailed = true;
+          debug.koiosDiscoverResult = JSON.stringify(result).slice(0, 100);
         }
       } catch (e) {
         log(id, 'koios-discover-err', { msg: e.message });
+        debug.koiosDiscoverError = e.message;
       }
+    } else {
+      log(id, 'no-stake-addrs');
+      debug.noStakeAddresses = true;
     }
 
     const isADA = !proposal.target_policy_id;
@@ -93,79 +118,124 @@ export default async function handler(req, res) {
     const targetAssetName = proposal.target_asset_name || '';
     let totalBalance = 0n;
 
+    log(id, 'balance-check-start', { isADA, targetPolicyId: targetPolicyId.slice(0, 16) + '...', targetAssetName: targetAssetName || '(empty)', addrCount: addrsToCheck.length });
+    debug.balanceCheck = { isADA, targetPolicyId: targetPolicyId.slice(0, 16) + '...', targetAssetName: targetAssetName || '(empty)', addrCount: addrsToCheck.length };
+
     if (isADA) {
       if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
         try {
-          const result = await koiosPost(`${KOIOS_URL}/account_info`, {
-            _stake_addresses: stakeAddresses,
-          });
+          log(id, 'ada-check-stake', { url: `${KOIOS_URL}/account_info` });
+          const result = await koiosPost(`${KOIOS_URL}/account_info`, { _stake_addresses: stakeAddresses }, id);
           if (Array.isArray(result)) {
-            for (const acct of result) {
-              totalBalance += BigInt(acct.balance || '0');
-            }
+            const balances = result.map(a => ({ addr: a.stake_address?.slice(0, 15) + '...', balance: a.balance }));
+            log(id, 'ada-stake-result', { count: result.length, balances });
+            debug.adaStake = balances;
+            for (const acct of result) totalBalance += BigInt(acct.balance || '0');
+          } else {
+            log(id, 'ada-stake-null', { result });
+            debug.adaStakeFailed = true;
+            debug.adaStakeResult = JSON.stringify(result).slice(0, 100);
           }
         } catch (e) {
           log(id, 'koios-ada-stake-err', { msg: e.message });
+          debug.adaStakeError = e.message;
         }
       }
 
       if (totalBalance <= 0n && addrsToCheck.length > 0) {
         try {
-          const result = await koiosPost(`${KOIOS_URL}/address_info`, {
-            _addresses: addrsToCheck,
-          });
+          log(id, 'ada-check-addr', { url: `${KOIOS_URL}/address_info`, addrs: addrsToCheck.slice(0, 3).map(a => a.slice(0, 15) + '...') });
+          const result = await koiosPost(`${KOIOS_URL}/address_info`, { _addresses: addrsToCheck }, id);
           if (Array.isArray(result)) {
-            for (const entry of result) {
-              totalBalance += BigInt(entry.balance || '0');
-            }
+            const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', balance: a.balance }));
+            log(id, 'ada-addr-result', { count: result.length, balances });
+            debug.adaAddress = balances;
+            for (const entry of result) totalBalance += BigInt(entry.balance || '0');
+          } else {
+            log(id, 'ada-addr-null', { result });
+            debug.adaAddressFailed = true;
+            debug.adaAddressResult = JSON.stringify(result).slice(0, 100);
           }
         } catch (e) {
           log(id, 'koios-ada-addr-err', { msg: e.message });
+          debug.adaAddressError = e.message;
         }
       }
     } else {
       if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
         try {
-          const result = await koiosPost(`${KOIOS_URL}/account_assets`, {
-            _stake_addresses: stakeAddresses,
-          });
+          log(id, 'token-check-stake', { url: `${KOIOS_URL}/account_assets` });
+          const result = await koiosPost(`${KOIOS_URL}/account_assets`, { _stake_addresses: stakeAddresses }, id);
           if (Array.isArray(result)) {
+            const summaries = result.map(a => ({
+              addr: a.stake_address?.slice(0, 15) + '...',
+              assetCount: Array.isArray(a.asset_list) ? a.asset_list.length : 0,
+              assets: Array.isArray(a.asset_list) ? a.asset_list.slice(0, 5).map(x => ({ policy: x.policy_id?.slice(0, 12) + '...', name: x.asset_name || '(empty)', qty: x.quantity })) : [],
+            }));
+            log(id, 'token-stake-result', { count: result.length, summaries });
+            debug.tokenStake = summaries;
             for (const acct of result) {
               if (Array.isArray(acct.asset_list)) {
                 for (const asset of acct.asset_list) {
-                  if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName) {
+                  const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName;
+                  log(id, 'token-check-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match, targetPolicy: targetPolicyId.slice(0, 12) + '...', targetName: targetAssetName || '(empty)' });
+                  if (match) {
                     totalBalance += BigInt(asset.quantity || '0');
                   }
                 }
               }
             }
+          } else {
+            log(id, 'token-stake-null', { result });
+            debug.tokenStakeFailed = true;
+            debug.tokenStakeResult = JSON.stringify(result).slice(0, 100);
           }
         } catch (e) {
           log(id, 'koios-assets-err', { msg: e.message });
+          debug.tokenStakeError = e.message;
         }
+      } else {
+        log(id, 'token-no-stake-skip-stake-level');
+        debug.tokenNoStakeAddresses = true;
       }
 
       if (totalBalance <= 0n && addrsToCheck.length > 0) {
         try {
-          const result = await koiosPost(`${KOIOS_URL}/address_assets`, {
-            _addresses: addrsToCheck,
-          });
+          log(id, 'token-check-addr', { url: `${KOIOS_URL}/address_assets` });
+          const result = await koiosPost(`${KOIOS_URL}/address_assets`, { _addresses: addrsToCheck }, id);
           if (Array.isArray(result)) {
+            const summaries = result.map(a => ({
+              addr: a.address?.slice(0, 15) + '...',
+              assetCount: Array.isArray(a.asset_list) ? a.asset_list.length : 0,
+              assets: Array.isArray(a.asset_list) ? a.asset_list.slice(0, 5).map(x => ({ policy: x.policy_id?.slice(0, 12) + '...', name: x.asset_name || '(empty)', qty: x.quantity })) : [],
+            }));
+            log(id, 'token-addr-result', { count: result.length, summaries });
+            debug.tokenAddress = summaries;
             for (const entry of result) {
               if (Array.isArray(entry.asset_list)) {
                 for (const asset of entry.asset_list) {
-                  if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName) {
+                  const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName;
+                  log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match, targetPolicy: targetPolicyId.slice(0, 12) + '...', targetName: targetAssetName || '(empty)' });
+                  if (match) {
                     totalBalance += BigInt(asset.quantity || '0');
                   }
                 }
               }
             }
+          } else {
+            log(id, 'token-addr-null', { result });
+            debug.tokenAddressFailed = true;
+            debug.tokenAddressResult = JSON.stringify(result).slice(0, 100);
           }
         } catch (e) {
           log(id, 'koios-addr-assets-err', { msg: e.message });
+          debug.tokenAddressError = e.message;
         }
       }
     }
+
+    debug.totalBalance = totalBalance.toString();
+    log(id, 'balance-done', { total: totalBalance.toString() });
 
     if (totalBalance > 0n) {
       const { error: voteErr } = await supabase
@@ -188,6 +258,7 @@ export default async function handler(req, res) {
     const label = isADA ? 'ADA' : 'the required token';
     return res.status(403).json({
       error: `No ${label} balance found for this wallet. You must hold ${label} to vote.`,
+      debug,
     });
   } catch (error) {
     log(id, 'catch', { msg: error.message });

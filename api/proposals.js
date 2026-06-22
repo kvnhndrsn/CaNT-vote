@@ -1,3 +1,9 @@
+const reqId = () => Math.random().toString(36).slice(2, 8);
+
+function log(id, step, data) {
+  console.log(JSON.stringify({ reqId: id, step, ...data }));
+}
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -15,19 +21,37 @@ function defaultKoiosUrl(network) {
 }
 
 async function koiosPost(url, body) {
+  const id = 'koios-' + reqId();
+  log(id, 'req', { url: url.slice(0, 60) + '..', bodyPreview: JSON.stringify(body).slice(0, 120) });
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!resp.ok) return null;
-  return resp.json();
+  log(id, 'resp', { status: resp.status, ok: resp.ok });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    log(id, 'err-body', { text: text.slice(0, 300) });
+    return null;
+  }
+  const json = await resp.json();
+  log(id, 'data', { isArray: Array.isArray(json), length: Array.isArray(json) ? json.length : typeof json });
+  return json;
 }
 
 async function koiosGet(url) {
+  const id = 'koios-' + reqId();
+  log(id, 'req', { url: url.slice(0, 60) + '..' });
   const resp = await fetch(url);
-  if (!resp.ok) return null;
-  return resp.json();
+  log(id, 'resp', { status: resp.status, ok: resp.ok });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    log(id, 'err-body', { text: text.slice(0, 300) });
+    return null;
+  }
+  const json = await resp.json();
+  log(id, 'data', { json });
+  return json;
 }
 
 function ipfsToHttp(url) {
@@ -65,56 +89,81 @@ function extractAssetMeta(metadata) {
 }
 
 async function fetchAssetInfo(assetPolicy, assetName) {
+  const id = 'asset-' + reqId();
   if (!assetPolicy) return null;
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   try {
+    log(id, 'fetch', { policy: assetPolicy.slice(0, 16) + '...', name: assetName || '(empty)' });
     const result = await koiosPost(`${koiosUrl}/asset_info`, {
       _asset_policy: assetPolicy,
       _asset_name: assetName || '',
     });
-    if (!Array.isArray(result) || result.length === 0) return null;
+    if (!Array.isArray(result) || result.length === 0) {
+      log(id, 'no-result', { result });
+      return null;
+    }
     const info = result[0];
+    log(id, 'got-info', { supply: info.total_supply, hasMeta: !!info.minting_tx_metadata });
     const { name, image } = extractAssetMeta(info.minting_tx_metadata);
+    log(id, 'extracted', { name, image });
     return {
       supply: info.total_supply,
       name,
       image,
     };
-  } catch {
+  } catch (e) {
+    log(id, 'error', { msg: e.message });
     return null;
   }
 }
 
 async function fetchLatestBlock() {
+  const id = 'block-' + reqId();
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   try {
+    log(id, 'fetch-tip', { url: `${koiosUrl}/tip` });
     const tip = await koiosGet(`${koiosUrl}/tip`);
+    log(id, 'tip-result', { tip });
     if (!tip) return null;
-    return { height: tip.block_no, slot: tip.slot_no };
-  } catch {
+    const result = { height: tip.block_no, slot: tip.slot_no };
+    log(id, 'tip-parsed', { result });
+    return result;
+  } catch (e) {
+    log(id, 'error', { msg: e.message });
     return null;
   }
 }
 
 async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targetAssetName) {
+  const id = 'check-' + reqId();
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   const isADA = !targetPolicyId;
   let totalBalance = 0n;
 
+  log(id, 'start', { isADA, targetPolicy: targetPolicyId.slice(0, 16) + '...', targetAsset: targetAssetName || '(empty)', addrCount: addresses.length, stakeCount: stakeAddresses.length });
+
   if (isADA) {
     if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
       const result = await koiosPost(`${koiosUrl}/account_info`, { _stake_addresses: stakeAddresses });
       if (Array.isArray(result)) {
+        const balances = result.map(a => ({ addr: a.stake_address?.slice(0, 15) + '...', bal: a.balance }));
+        log(id, 'ada-stake', { count: result.length, balances });
         for (const acct of result) totalBalance += BigInt(acct.balance || '0');
+      } else {
+        log(id, 'ada-stake-null', { result });
       }
     }
     if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
       const result = await koiosPost(`${koiosUrl}/address_info`, { _addresses: addresses });
       if (Array.isArray(result)) {
+        const balances = result.map(a => ({ addr: a.address?.slice(0, 15) + '...', bal: a.balance }));
+        log(id, 'ada-addr', { count: result.length, balances });
         for (const entry of result) totalBalance += BigInt(entry.balance || '0');
+      } else {
+        log(id, 'ada-addr-null', { result });
       }
     }
   } else {
@@ -124,12 +173,14 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
         for (const acct of result) {
           if (Array.isArray(acct.asset_list)) {
             for (const asset of acct.asset_list) {
-              if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '')) {
-                totalBalance += BigInt(asset.quantity || '0');
-              }
+              const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+              log(id, 'token-stake-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
+              if (match) totalBalance += BigInt(asset.quantity || '0');
             }
           }
         }
+      } else {
+        log(id, 'token-stake-null', { result });
       }
     }
     if (totalBalance <= 0n && Array.isArray(addresses) && addresses.length > 0) {
@@ -138,16 +189,19 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
         for (const entry of result) {
           if (Array.isArray(entry.asset_list)) {
             for (const asset of entry.asset_list) {
-              if (asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '')) {
-                totalBalance += BigInt(asset.quantity || '0');
-              }
+              const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+              log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
+              if (match) totalBalance += BigInt(asset.quantity || '0');
             }
           }
         }
+      } else {
+        log(id, 'token-addr-null', { result });
       }
     }
   }
 
+  log(id, 'done', { total: totalBalance.toString() });
   return totalBalance;
 }
 
@@ -264,12 +318,16 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      const pid = 'create-' + reqId();
       const { title, description, targetPolicyId, targetAssetName, creatorAddress, addresses, stakeAddresses } = req.body;
+
+      log(pid, 'body', { title, description, targetPolicyId: targetPolicyId ? targetPolicyId.slice(0, 16) + '...' : null, hasAddrs: Array.isArray(addresses), hasStake: Array.isArray(stakeAddresses) });
 
       if (!title || !description || !creatorAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      log(pid, 'check-balance', { targetPolicy: targetPolicyId?.slice(0, 16) || 'ADA' });
       const balance = await checkTokenBalance(
         addresses || [creatorAddress],
         stakeAddresses || [],
@@ -277,15 +335,19 @@ export default async function handler(req, res) {
         targetAssetName || ''
       );
 
+      log(pid, 'balance-result', { balance: balance.toString() });
+
       if (balance <= 0n) {
         const label = !targetPolicyId ? 'ADA' : 'this token';
         return res.status(403).json({ error: `You must hold ${label} to create a proposal for it.` });
       }
 
+      log(pid, 'fetch-tip');
       const tip = await fetchLatestBlock();
       if (!tip) {
         return res.status(500).json({ error: 'Could not fetch latest block. Try again later.' });
       }
+      log(pid, 'tip', { height: tip.height, slot: tip.slot });
 
       const { data, error } = await supabase
         .from('proposals')
@@ -302,6 +364,7 @@ export default async function handler(req, res) {
         .single();
 
       if (error) throw error;
+      log(pid, 'created', { id: data.id });
       return res.status(201).json(data);
     }
 
