@@ -195,6 +195,22 @@ async function fetchMinswapPools() {
     const poolArr = json.pool_metrics || [];
     log(id, 'pools', { count: poolArr.length });
 
+    if (poolArr.length > 0) {
+      const p = poolArr[0];
+      log(id, 'pool0', {
+        a_pol: p.asset_a?.currency_symbol,
+        a_name: p.asset_a?.token_name,
+        b_pol: p.asset_b?.currency_symbol,
+        b_name: p.asset_b?.token_name,
+        raw_a: p.liquidity_a_raw,
+        raw_b: p.liquidity_b_raw,
+        val_a: p.liquidity_a,
+        val_b: p.liquidity_b,
+        tvl: p.liquidity,
+        type: p.type,
+      });
+    }
+
     const priceMap = {};
     const lpMap = {};
 
