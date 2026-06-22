@@ -3,9 +3,9 @@ import { bech32 } from 'bech32';
 console.log('[app] module loaded');
 
 const WALLET_LOGOS = {
-  eternl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b6bf5"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">E</text></svg>'),
+  eternl: '/img/eternl.png',
   nami: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f7931a"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">N</text></svg>'),
-  lace: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ff6b35"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">L</text></svg>'),
+  lace: '/img/lace.svg',
   flint: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#00b4d8"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">F</text></svg>'),
   gerowallet: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#7c3aed"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">G</text></svg>'),
   typhoncip30: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#10b981"/><text x="16" y="22" font-size="16" text-anchor="middle" fill="white" font-weight="bold">T</text></svg>'),
@@ -25,7 +25,7 @@ const KNOWN_WALLETS = [
 ];
 
 const TOKEN_LOGOS = {
-  ADA: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#4a8cff"/><path d="M16 9l4 10-4 3-4-3z" fill="none" stroke="white" stroke-width="2" stroke-linejoin="round" opacity=".9"/><circle cx="16" cy="19" r="1.5" fill="white" opacity=".9"/></svg>'),
+  ADA: '/img/cardano-starburst.svg',
   SNEK: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#22c55e"/><path d="M10 20c2-4 4-6 6-6s4 3 6 3-2 4-4 4-6-2-8-1z" fill="white" opacity=".9"/><circle cx="12" cy="13" r="1.5" fill="white"/><circle cx="20" cy="13" r="1.5" fill="white"/></svg>'),
   NIGHT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M20 8c-5 0-9 4-9 9s4 9 9 9c-3 0-6-3-6-6s3-6 6-6z" fill="white" opacity=".9"/><circle cx="23" cy="11" r="1.2" fill="white" opacity=".7"/><circle cx="25" cy="16" r=".8" fill="white" opacity=".5"/></svg>'),
   WMTX: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b82f6"/><circle cx="16" cy="16" r="6" fill="none" stroke="white" stroke-width="1.5" opacity=".9"/><path d="M10 10l3 3M22 10l-3 3M10 22l3-3M22 22l-3-3" stroke="white" stroke-width="1.5" opacity=".6"/><circle cx="16" cy="10" r="1" fill="white"/><circle cx="16" cy="22" r="1" fill="white"/><circle cx="10" cy="16" r="1" fill="white"/><circle cx="22" cy="16" r="1" fill="white"/></svg>'),
@@ -850,12 +850,35 @@ function startTicker() {
   }, 1000);
 }
 
+/* ---------- Theme ---------- */
+
+function toggleTheme() {
+  const html = document.documentElement;
+  html.classList.add('transitioning');
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('cnt_vote_theme', isDark ? 'light' : 'dark');
+  $('#themeBtn').textContent = isDark ? '☀' : '☾';
+  setTimeout(() => html.classList.remove('transitioning'), 850);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('cnt_vote_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+  if (!saved) localStorage.setItem('cnt_vote_theme', theme);
+  $('#themeBtn').textContent = theme === 'dark' ? '☀' : '☾';
+}
+
 /* ---------- Init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   updateWalletUI();
   fetchProposals();
   startTicker();
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);
+$('#themeBtn')?.addEventListener('click', toggleTheme);

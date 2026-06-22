@@ -1,19 +1,68 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0a0a0f;
-  --surface: #141420;
-  --surface2: #1c1c2e;
-  --border: #2a2a3e;
-  --primary: #4a8cff;
-  --primary-dim: rgba(74, 140, 255, 0.12);
-  --text: #e4e4e7;
-  --text2: #a1a1aa;
-  --text3: #52525b;
+  color-scheme: light;
+  --accent: #d94f6f;
+  --accent-light: #e87a90;
+  --accent-bg: rgba(217, 79, 111, 0.12);
+  --accent-hover: rgba(217, 79, 111, 0.22);
+  --grey-50: #171717;
+  --grey-100: #262626;
+  --grey-200: #404040;
+  --grey-300: #525252;
+  --grey-400: #737373;
+  --grey-500: #a3a3a3;
+  --grey-600: #d4d4d4;
+  --grey-700: #e5e5e5;
+  --grey-800: #f5f5f5;
+  --grey-900: #fafafa;
+  --bg: var(--grey-800);
+  --surface: var(--grey-700);
+  --surface2: var(--grey-600);
+  --border: var(--grey-500);
+  --text: var(--grey-50);
+  --text2: var(--grey-300);
+  --text3: var(--grey-400);
   --success: #22c55e;
   --danger: #ef4444;
   --radius: 10px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  --primary: var(--accent);
+  --primary-dim: var(--accent-bg);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: #f28a9e;
+  --accent-light: #f6a7b5;
+  --accent-bg: rgba(242, 138, 158, 0.12);
+  --accent-hover: rgba(242, 138, 158, 0.22);
+  --grey-50: #fafafa;
+  --grey-100: #f5f5f5;
+  --grey-200: #e5e5e5;
+  --grey-300: #d4d4d4;
+  --grey-400: #a3a3a3;
+  --grey-500: #737373;
+  --grey-600: #525252;
+  --grey-700: #404040;
+  --grey-800: #262626;
+  --grey-900: #171717;
+  --bg: var(--grey-800);
+  --surface: var(--grey-900);
+  --surface2: var(--grey-700);
+  --border: var(--grey-600);
+  --text: var(--grey-50);
+  --text2: var(--grey-300);
+  --text3: var(--grey-400);
+  --primary: var(--accent);
+  --primary-dim: var(--accent-bg);
+}
+
+html.transitioning,
+html.transitioning *,
+html.transitioning *::before,
+html.transitioning *::after {
+  transition: background-color 0.8s ease, color 0.8s ease, border-color 0.8s ease, box-shadow 0.8s ease !important;
 }
 
 html { font-size: 15px; }
@@ -202,7 +251,7 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 
 .wallet-btn:hover { border-color: var(--primary); background: var(--primary-dim); }
 
-.wallet-logo { width: 24px; height: 24px; flex-shrink: 0; }
+.wallet-logo { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
 
 .tooltip { font-size: 0.72rem; color: var(--text3); }
 
@@ -219,28 +268,27 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 .toast.success { border-color: var(--success); }
 .toast.error { border-color: var(--danger); }
 
-.tally-bar {
-  height: 5px; border-radius: 3px; background: var(--surface2);
-  overflow: hidden; margin-top: 0.4rem;
-}
+.card-tally { margin-top: 0.35rem; }
 
-.tally-bar-fill { height: 100%; border-radius: 3px; background: var(--primary); transition: width 0.3s; }
+.tally-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface2); }
 
-.results { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.tally-bar-seg { min-width: 2px; transition: flex 0.2s; }
 
-.result-row { font-size: 0.78rem; color: var(--text2); }
+.tally-bar-seg:first-child { border-radius: 4px 0 0 4px; }
 
-.result-row .label { display: flex; justify-content: space-between; margin-bottom: 0.15rem; }
+.tally-bar-seg:last-child { border-radius: 0 4px 4px 0; }
 
-.table-wrap { overflow-x: auto; }
+.tally-lines { display: flex; gap: 0.6rem; margin-top: 0.3rem; font-size: 0.72rem; flex-wrap: wrap; }
 
-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.tally-line { display: flex; align-items: center; gap: 0.25rem; color: var(--text2); }
 
-th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+.tally-line strong { color: var(--text); font-weight: 600; }
 
-th { color: var(--text2); font-weight: 500; }
+.tally-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-td { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem; word-break: break-all; }
+.tally-w { color: var(--text3); }
+
+.tally-total { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; }
 
 .filter-row {
   display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;
@@ -269,28 +317,6 @@ td { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.72rem; word-br
 .token-thumb { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; object-fit: cover; margin-top: 0.1rem; }
 
 .token-logo { width: 20px; height: 20px; border-radius: 50%; vertical-align: middle; object-fit: cover; }
-
-.card-tally { margin-top: 0.35rem; }
-
-.tally-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface2); }
-
-.tally-bar-seg { min-width: 2px; transition: flex 0.2s; }
-
-.tally-bar-seg:first-child { border-radius: 4px 0 0 4px; }
-
-.tally-bar-seg:last-child { border-radius: 0 4px 4px 0; }
-
-.tally-lines { display: flex; gap: 0.6rem; margin-top: 0.3rem; font-size: 0.72rem; flex-wrap: wrap; }
-
-.tally-line { display: flex; align-items: center; gap: 0.25rem; color: var(--text2); }
-
-.tally-line strong { color: var(--text); font-weight: 600; }
-
-.tally-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-.tally-w { color: var(--text3); }
-
-.tally-total { font-size: 0.68rem; color: var(--text3); margin-top: 0.15rem; }
 
 @media (max-width: 640px) {
   .container { padding: 1rem; }
