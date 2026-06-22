@@ -183,7 +183,7 @@ async function fetchMinswapPools() {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 1000 }),
+        body: JSON.stringify({ limit: 1000, sort_field: 'liquidity' }),
         signal: AbortSignal.timeout(15000),
       }
     );
@@ -226,9 +226,9 @@ async function fetchMinswapPools() {
         const isAdaB = !policyB;
 
         if (isAdaB && !isAdaA) {
-          priceMap[keyA] = reserveB > 0 ? adaValB / reserveB : null;
+          priceMap[keyA] = reserveA > 0 ? adaValA / reserveA : null;
         } else if (isAdaA && !isAdaB) {
-          priceMap[keyB] = reserveA > 0 ? adaValA / reserveA : null;
+          priceMap[keyB] = reserveB > 0 ? adaValB / reserveB : null;
         } else if (!isAdaA && !isAdaB) {
           if (adaValA > 0 && reserveA > 0) priceMap[keyA] = adaValA / reserveA;
           if (adaValB > 0 && reserveB > 0) priceMap[keyB] = adaValB / reserveB;
