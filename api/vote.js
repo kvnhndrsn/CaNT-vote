@@ -116,6 +116,11 @@ export default async function handler(req, res) {
     const isADA = !proposal.target_policy_id;
     const targetPolicyId = proposal.target_policy_id || '';
     const targetAssetName = proposal.target_asset_name || '';
+    const matchAsset = (asset) => {
+      if (asset.policy_id !== targetPolicyId) return false;
+      if (!targetAssetName) return true;
+      return (asset.asset_name || '') === targetAssetName;
+    };
     let totalBalance = 0n;
 
     log(id, 'balance-check-start', { isADA, targetPolicyId: targetPolicyId.slice(0, 16) + '...', targetAssetName: targetAssetName || '(empty)', addrCount: addrsToCheck.length });
@@ -176,7 +181,7 @@ export default async function handler(req, res) {
             log(id, 'token-stake-result', { count: result.length, entries });
             debug.tokenStake = entries;
             for (const asset of result) {
-              const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName;
+              const match = matchAsset(asset);
               log(id, 'token-stake-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match, targetPolicy: targetPolicyId.slice(0, 12) + '...', targetName: targetAssetName || '(empty)' });
               if (match) {
                 totalBalance += BigInt(asset.quantity || '0');
@@ -214,7 +219,7 @@ export default async function handler(req, res) {
               log(id, 'token-addr-batch-result', { count: result.length, entries });
               debug.tokenAddress = (debug.tokenAddress || []).concat(entries);
               for (const asset of result) {
-                const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === targetAssetName;
+                const match = matchAsset(asset);
                 log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match, targetPolicy: targetPolicyId.slice(0, 12) + '...', targetName: targetAssetName || '(empty)' });
                 if (match) {
                   totalBalance += BigInt(asset.quantity || '0');

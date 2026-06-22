@@ -141,6 +141,11 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
   const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
   const isADA = !targetPolicyId;
+  const matchAsset = (asset) => {
+    if (asset.policy_id !== targetPolicyId) return false;
+    if (!targetAssetName) return true;
+    return (asset.asset_name || '') === targetAssetName;
+  };
   let totalBalance = 0n;
 
   log(id, 'start', { isADA, targetPolicy: targetPolicyId.slice(0, 16) + '...', targetAsset: targetAssetName || '(empty)', addrCount: addresses.length, stakeCount: stakeAddresses.length });
@@ -172,7 +177,7 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
       if (Array.isArray(result)) {
         log(id, 'token-stake-raw', { count: result.length, sample: result.slice(0, 3).map(a => ({ policy: a.policy_id?.slice(0, 12) + '...', name: a.asset_name || '(empty)', qty: a.quantity })) });
         for (const asset of result) {
-          const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+          const match = matchAsset(asset);
           log(id, 'token-stake-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
           if (match) totalBalance += BigInt(asset.quantity || '0');
         }
@@ -188,7 +193,7 @@ async function checkTokenBalance(addresses, stakeAddresses, targetPolicyId, targ
         if (Array.isArray(result)) {
           log(id, 'token-addr-batch', { batchIdx: i / BATCH_SIZE, count: result.length, sample: result.slice(0, 3).map(a => ({ addr: a.address?.slice(0, 12) + '...', policy: a.policy_id?.slice(0, 12) + '...', name: a.asset_name || '(empty)', qty: a.quantity })) });
           for (const asset of result) {
-            const match = asset.policy_id === targetPolicyId && (asset.asset_name || '') === (targetAssetName || '');
+            const match = matchAsset(asset);
             log(id, 'token-addr-entry', { policy: asset.policy_id?.slice(0, 12) + '...', name: asset.asset_name || '(empty)', qty: asset.quantity, match });
             if (match) totalBalance += BigInt(asset.quantity || '0');
           }
