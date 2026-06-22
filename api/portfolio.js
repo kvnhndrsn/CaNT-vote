@@ -192,12 +192,14 @@ async function fetchMinswapPools() {
       return { pools: [], priceMap: {}, lpMap: {} };
     }
     const json = await resp.json();
+    log(id, 'resp-keys', { topKeys: Object.keys(json) });
     const poolArr = json.pool_metrics || json.pools || json.data || [];
     log(id, 'pools', { count: poolArr.length });
 
     if (poolArr.length > 0) {
       const first = poolArr[0];
       log(id, 'pool-sample', { keys: Object.keys(first), type: first.type, id: (first.lp_asset || {}).token_name });
+      log(id, 'pool-raw', { a: JSON.stringify(first.asset_a).slice(0, 100), b: JSON.stringify(first.asset_b).slice(0, 100), liq: first.liquidity_a, liqCur: first.liquidity_a_currency, lp: first.lp_asset });
     }
 
     const priceMap = {};
@@ -296,7 +298,7 @@ export default async function handler(req, res) {
       fetchMinswapPools(),
     ]);
 
-    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length });
+    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length, sampleKeys: Object.keys(priceMap).slice(0, 5) });
 
     const adaInAda = Number(adaBalance) / 1e6;
 
@@ -317,6 +319,7 @@ export default async function handler(req, res) {
       }
       const entries = Object.values(unique);
       log(id, 'unique-tokens', { count: entries.length, policies: entries.map(e => e.policyId + '.' + (e.assetName || '').slice(0, 12) + '..') });
+      log(id, 'token-keys', { keys: entries.map(e => tokenPriceKey(e.policyId, e.assetName)) });
 
       const metaResults = await Promise.all(
         entries.map(e => fetchAssetMeta(e.policyId, e.assetName).catch(() => null))
@@ -334,6 +337,9 @@ export default async function handler(req, res) {
 
         const pKey = tokenPriceKey(e.policyId, e.assetName);
         const priceInAda = priceMap[pKey] || null;
+        if (priceInAda != null) {
+          log(id, 'price-hit', { token: (e.fingerprint || '').slice(0, 14), pKey: pKey.slice(0, 20), price: priceInAda });
+        }
         const wholeAmt = Number(rawQty) / Math.pow(10, decimals);
         const valueAda = priceInAda != null ? wholeAmt * priceInAda : null;
         const valueAdaFormatted = valueAda != null
