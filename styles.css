@@ -428,6 +428,91 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 
 .pf-tag-lp { background: var(--accent-bg); color: var(--accent); }
 
+/* ---------- Portfolio Net Worth & Chart ---------- */
+
+.pf-networth-card {
+  background: var(--surface); border: 2px solid var(--primary);
+  border-radius: var(--radius); padding: 0.85rem 1rem;
+  text-align: center; margin-bottom: 0.75rem;
+}
+
+.pf-networth-label {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text3); margin-bottom: 0.15rem;
+}
+
+.pf-networth-value {
+  font-size: 1.65rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--text); line-height: 1.2;
+}
+
+.pf-networth-sub {
+  font-size: 0.75rem; color: var(--text3); margin-top: 0.05rem;
+}
+
+.pf-chart-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.85rem; margin-bottom: 0.75rem;
+}
+
+.pf-chart-wrap {
+  display: flex; align-items: center; gap: 1rem;
+}
+
+.pf-chart-svg {
+  width: 160px; height: 160px; flex-shrink: 0;
+}
+
+.pf-chart-svg path { transition: opacity 0.15s; }
+.pf-chart-svg path:hover { opacity: 0.8; }
+
+.pf-chart-legend {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem;
+}
+
+.pf-chart-legend-item {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.72rem; line-height: 1.3;
+}
+
+.pf-chart-swatch {
+  width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+}
+
+.pf-chart-legend-label {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); font-weight: 500;
+}
+
+.pf-chart-legend-pct {
+  color: var(--text2); font-weight: 600; font-variant-numeric: tabular-nums;
+  width: 3.2rem; text-align: right;
+}
+
+.pf-chart-legend-ada {
+  color: var(--text3); font-variant-numeric: tabular-nums;
+  width: 5.5rem; text-align: right;
+}
+
+.pf-value-row {
+  font-size: 0.72rem; font-weight: 600; margin-top: 0.15rem;
+  color: var(--text2);
+}
+
+.pf-value-ada { color: var(--primary); }
+
+.pf-lp-card .pf-value-row { color: var(--accent); }
+
+.pf-price-note {
+  text-align: center; font-size: 0.62rem; color: var(--text3);
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 500px) {
+  .pf-chart-wrap { flex-direction: column; align-items: stretch; }
+  .pf-chart-svg { align-self: center; }
+}
+
 .footer {
   text-align: center; padding: 1.5rem 1.25rem 1rem;
   font-size: 0.72rem; color: var(--text3);

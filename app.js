@@ -1007,6 +1007,71 @@ document.addEventListener('error', (e) => {
 
 /* ---------- Portfolio ---------- */
 
+const PIE_COLORS = [
+  '#d94f6f', '#f59e0b', '#10b981', '#6366f1', '#06b6d4',
+  '#f97316', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308',
+  '#3b82f6', '#84cc16',
+];
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, r, endAngle);
+  const end = polarToCartesian(cx, cy, r, startAngle);
+  const large = endAngle - startAngle > 180 ? 1 : 0;
+  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y} Z`;
+}
+
+function generatePieHtml(slices) {
+  const cx = 100, cy = 100, r = 88;
+  const total = slices.reduce((s, sl) => s + sl.value, 0);
+  if (total <= 0) return '';
+
+  let angle = 0;
+  const paths = [];
+  const legendItems = [];
+
+  for (let i = 0; i < slices.length; i++) {
+    const pct = slices[i].value / total;
+    if (pct < 0.005) continue;
+    const endAngle = angle + pct * 360;
+    const pathD = describeArc(cx, cy, r, angle, endAngle);
+    paths.push({ d: pathD, fill: slices[i].color, label: slices[i].label });
+    legendItems.push({
+      color: slices[i].color,
+      label: slices[i].label,
+      pct: (pct * 100).toFixed(1),
+      ada: slices[i].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    });
+    angle = endAngle;
+  }
+
+  const pathHtml = paths.map(p => `<path d="${escHtml(p.d)}" fill="${p.fill}"/>`).join('');
+
+  const legendHtml = legendItems.map(l => `
+    <div class="pf-chart-legend-item">
+      <span class="pf-chart-swatch" style="background:${l.color}"></span>
+      <span class="pf-chart-legend-label">${escHtml(l.label)}</span>
+      <span class="pf-chart-legend-pct">${l.pct}%</span>
+      <span class="pf-chart-legend-ada">${l.ada} ADA</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="pf-chart-wrap">
+      <svg viewBox="0 0 200 200" class="pf-chart-svg">
+        ${pathHtml}
+        <circle cx="${cx}" cy="${cy}" r="52" fill="var(--surface)" stroke="none"/>
+        <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700">${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</text>
+        <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text3)" font-size="11" font-weight="500">ADA</text>
+      </svg>
+      <div class="pf-chart-legend">${legendHtml}</div>
+    </div>`;
+}
+
 async function fetchPortfolio() {
   const container = $('#portfolioContent');
   container.innerHTML = '<div class="empty-state"><p>Loading portfolio...</p></div>';
@@ -1031,7 +1096,44 @@ function renderPortfolio(data) {
   const container = $('#portfolioContent');
   const ada = Number(data.adaBalance) / 1_000_000;
 
-  let html = `
+  const slices = [];
+  let colorIdx = 0;
+  const nextColor = () => {
+    const c = PIE_COLORS[colorIdx % PIE_COLORS.length];
+    colorIdx++;
+    return c;
+  };
+
+  slices.push({ label: 'ADA', value: ada, color: PIE_COLORS[0] });
+  colorIdx = 1;
+
+  for (const t of data.tokens) {
+    if (t.valueAda && t.valueAda > 0.01) {
+      slices.push({ label: t.ticker || t.name || shorten(t.fingerprint || t.policyId, 5), value: t.valueAda, color: nextColor() });
+    }
+  }
+  for (const t of data.lpPositions) {
+    const v = t.lpValueAda || t.valueAda || 0;
+    if (v > 0.01) {
+      const dex = t.lpInfo ? t.lpInfo.dex : 'LP';
+      slices.push({ label: dex + ' LP', value: v, color: nextColor() });
+    }
+  }
+
+  let html = '';
+
+  if (data.netWorthAda != null) {
+    html += `
+      <div class="pf-networth-card">
+        <div class="pf-networth-label">Net Worth</div>
+        <div class="pf-networth-value">${escHtml(data.netWorthFormatted)}</div>
+        <div class="pf-networth-sub">ADA</div>
+      </div>`;
+  }
+
+  html += '<div class="pf-chart-card">' + generatePieHtml(slices) + '</div>';
+
+  html += `
     <div class="pf-card pf-ada">
       <div class="pf-card-header">
         <img class="pf-logo" src="/img/cardano-starburst.svg" alt="">
@@ -1045,9 +1147,11 @@ function renderPortfolio(data) {
     for (const t of data.lpPositions) {
       const label = t.ticker || t.name || (t.fingerprint ? shorten(t.fingerprint, 5) : shorten(t.policyId, 5));
       const dexTag = t.lpInfo ? ` <span class="pf-tag pf-tag-lp">${escHtml(t.lpInfo.dex)}</span>` : '';
-      const poolInfo = t.lpInfo && t.lpInfo.poolLabel ? `<div class="pf-sub">Pool: ${escHtml(shorten(t.lpInfo.poolLabel, 8))}</div>` : '';
       const imgSrc = t.image || null;
       const imgHtml = imgSrc ? `<img class="pf-logo" src="${escHtml(imgSrc)}" alt="">` : '<div class="pf-logo pf-logo-placeholder"></div>';
+      const valueRow = t.lpValueFormatted
+        ? `<div class="pf-value-row">${escHtml(t.lpValueFormatted)} ADA</div>`
+        : (t.valueAdaFormatted ? `<div class="pf-value-row">${escHtml(t.valueAdaFormatted)} ADA</div>` : '');
       html += `
         <div class="pf-card pf-lp-card">
           <div class="pf-card-header">
@@ -1055,7 +1159,7 @@ function renderPortfolio(data) {
             <span class="pf-name">${escHtml(label)}${dexTag}</span>
             <span class="pf-balance pf-lp-balance">${escHtml(t.displayQty)}</span>
           </div>
-          ${poolInfo}
+          ${valueRow}
           <div class="pf-sub">${escHtml(shorten(t.fingerprint || t.policyId, 6))}</div>
         </div>`;
     }
@@ -1073,6 +1177,9 @@ function renderPortfolio(data) {
         return curated ? curated.logo : null;
       })();
       const imgHtml = imgSrc ? `<img class="pf-logo" src="${escHtml(imgSrc)}" alt="">` : '<div class="pf-logo pf-logo-placeholder"></div>';
+      const valueRow = t.valueAdaFormatted
+        ? `<div class="pf-value-row"><span class="pf-value-ada">${escHtml(t.valueAdaFormatted)} ADA</span></div>`
+        : '';
       html += `
         <div class="pf-card">
           <div class="pf-card-header">
@@ -1080,10 +1187,16 @@ function renderPortfolio(data) {
             <span class="pf-name">${escHtml(label)}</span>
             <span class="pf-balance">${escHtml(t.displayQty)}</span>
           </div>
+          ${valueRow}
           <div class="pf-sub">${escHtml(shorten(t.fingerprint || t.policyId, 6))}</div>
         </div>`;
     }
     html += '</div>';
+  }
+
+  if (data.pricesUpdatedAt) {
+    const d = new Date(data.pricesUpdatedAt);
+    html += `<div class="pf-price-note">Prices from Minswap &middot; ${d.toLocaleTimeString()}</div>`;
   }
 
   container.innerHTML = html;
