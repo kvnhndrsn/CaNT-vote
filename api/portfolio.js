@@ -183,7 +183,7 @@ async function fetchMinswapPools() {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 1000, sort_field: 'liquidity' }),
+        body: JSON.stringify({ limit: 100, sort_field: 'liquidity' }),
         signal: AbortSignal.timeout(15000),
       }
     );
@@ -192,15 +192,8 @@ async function fetchMinswapPools() {
       return { pools: [], priceMap: {}, lpMap: {} };
     }
     const json = await resp.json();
-    log(id, 'resp-keys', { topKeys: Object.keys(json) });
-    const poolArr = json.pool_metrics || json.pools || json.data || [];
+    const poolArr = json.pool_metrics || [];
     log(id, 'pools', { count: poolArr.length });
-
-    if (poolArr.length > 0) {
-      const first = poolArr[0];
-      log(id, 'pool-sample', { keys: Object.keys(first), type: first.type, id: (first.lp_asset || {}).token_name });
-      log(id, 'pool-raw', { a: JSON.stringify(first.asset_a).slice(0, 100), b: JSON.stringify(first.asset_b).slice(0, 100), liq: first.liquidity_a, liqCur: first.liquidity_a_currency, lp: first.lp_asset });
-    }
 
     const priceMap = {};
     const lpMap = {};
@@ -214,13 +207,13 @@ async function fetchMinswapPools() {
         const nameA = assetA.token_name || '';
         const policyB = assetB.currency_symbol || '';
         const nameB = assetB.token_name || '';
-        const reserveA = pool.liquidity_a || 0;
-        const reserveB = pool.liquidity_b || 0;
-        const adaValA = pool.liquidity_a_currency || 0;
-        const adaValB = pool.liquidity_b_currency || 0;
-        const tvlAda = pool.liquidity_currency || 0;
+        const rawA = pool.liquidity_a_raw || 0;
+        const rawB = pool.liquidity_b_raw || 0;
+        const adaValA = pool.liquidity_a || 0;
+        const adaValB = pool.liquidity_b || 0;
+        const tvlAda = pool.liquidity || 0;
 
-        if (reserveA <= 0 || reserveB <= 0) continue;
+        if (rawA <= 0 || rawB <= 0) continue;
 
         const keyA = tokenPriceKey(policyA, nameA);
         const keyB = tokenPriceKey(policyB, nameB);
@@ -228,20 +221,17 @@ async function fetchMinswapPools() {
         const isAdaB = !policyB;
 
         if (isAdaB && !isAdaA) {
-          priceMap[keyA] = reserveA > 0 ? adaValA / reserveA : null;
+          priceMap[keyA] = rawA > 0 ? adaValA / rawA : null;
         } else if (isAdaA && !isAdaB) {
-          priceMap[keyB] = reserveB > 0 ? adaValB / reserveB : null;
+          priceMap[keyB] = rawB > 0 ? adaValB / rawB : null;
         } else if (!isAdaA && !isAdaB) {
-          if (adaValA > 0 && reserveA > 0) priceMap[keyA] = adaValA / reserveA;
-          if (adaValB > 0 && reserveB > 0) priceMap[keyB] = adaValB / reserveB;
+          if (adaValA > 0 && rawA > 0) priceMap[keyA] = adaValA / rawA;
+          if (adaValB > 0 && rawB > 0) priceMap[keyB] = adaValB / rawB;
         }
 
         if (poolId) {
           const lpKey = (KNOWN_DEX_LP[0].policyId + poolId).toLowerCase();
-          lpMap[lpKey] = {
-            poolId,
-            tvlAda,
-          };
+          lpMap[lpKey] = { poolId, tvlAda };
         }
       } catch (e) {
         continue;
@@ -298,7 +288,7 @@ export default async function handler(req, res) {
       fetchMinswapPools(),
     ]);
 
-    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length, sampleKeys: Object.keys(priceMap).slice(0, 5) });
+    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length });
 
     const adaInAda = Number(adaBalance) / 1e6;
 
@@ -319,7 +309,6 @@ export default async function handler(req, res) {
       }
       const entries = Object.values(unique);
       log(id, 'unique-tokens', { count: entries.length, policies: entries.map(e => e.policyId + '.' + (e.assetName || '').slice(0, 12) + '..') });
-      log(id, 'token-keys', { keys: entries.map(e => tokenPriceKey(e.policyId, e.assetName)) });
 
       const metaResults = await Promise.all(
         entries.map(e => fetchAssetMeta(e.policyId, e.assetName).catch(() => null))
@@ -337,9 +326,6 @@ export default async function handler(req, res) {
 
         const pKey = tokenPriceKey(e.policyId, e.assetName);
         const priceInAda = priceMap[pKey] || null;
-        if (priceInAda != null) {
-          log(id, 'price-hit', { token: (e.fingerprint || '').slice(0, 14), pKey: pKey.slice(0, 20), price: priceInAda });
-        }
         const wholeAmt = Number(rawQty) / Math.pow(10, decimals);
         const valueAda = priceInAda != null ? wholeAmt * priceInAda : null;
         const valueAdaFormatted = valueAda != null
