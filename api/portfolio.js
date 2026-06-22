@@ -101,7 +101,7 @@ async function fetchAssetMeta(policyId, assetName) {
   } catch (e) {
     log(id, 'error', { msg: e.message });
   }
-  let ticker = null, decimals = null, regLogo = null;
+  let ticker = null, decimals = null;
   if (assetName) {
     const reg = await fetchTokenRegistryAsset(policyId, assetName);
     if (reg) {
@@ -112,6 +112,156 @@ async function fetchAssetMeta(policyId, assetName) {
     }
   }
   return { name, image, ticker, decimals };
+}
+
+const KNOWN_DEX_LP = [
+  { policyId: 'e4214b7cce62ac8f3f03c1eac401f3b7676f6c4e0fc0b9a6e7c6c3b', dex: 'Minswap V2', label: 'Minswap LP' },
+  { policyId: '2adaf209a1fab4acd96c80d385d8da55d64f2ce2fa88b1b5a2a8365e', dex: 'SundaeSwap', label: 'Sundae LP' },
+  { policyId: 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a', dex: 'WingRiders', label: 'WingRiders LP' },
+  { policyId: '8482d2af53f8e565c1a54843ced2783b4ed7e6996e7051b71818e7d0', dex: 'VyFinance', label: 'VyFinance LP' },
+  { policyId: '2e27fc257632c77e7337c4984355ef11a1285ee6f84a769f029a1a59', dex: 'Minswap V1', label: 'Minswap V1 LP' },
+];
+
+const KNOWN_PROTOCOL_TOKENS = [
+  { policyId: 'f66d78b4a3cb3d37afa0ec36461e51ecbdee8aa51e95f0e8fc1e97fe', ticker: 'iUSD', name: 'Indigo iUSD' },
+  { policyId: '8f1ef40c87b12a45c597534fd7d5c5bd41697b04693a557e59c7253', ticker: 'iBTC', name: 'Indigo iBTC' },
+  { policyId: '8a1cfae21368b8bebbbedf0bebb45e7a8c7c8f0b3e5f8f0b3e5f8a1c', ticker: 'DJED', name: 'Djed' },
+  { policyId: '8a1cfae21368b8bebbbedf0bebb45e7a8c7c8f0b3e5f8f0b3e5f8a1d', ticker: 'SHEN', name: 'Shen' },
+  { policyId: '3ea87a72bd3b5e3623fdc265a6cb0e04c19a84a6fa6d7e1234567890', ticker: 'LQ', name: 'Liqwid LQ' },
+];
+
+async function fetchAdaBalance(stakeAddresses, addresses, koiosUrl, id) {
+  if (Array.isArray(stakeAddresses) && stakeAddresses.length > 0) {
+    const result = await koiosPost(`${koiosUrl}/account_info`, {
+      _stake_addresses: stakeAddresses,
+    }, id);
+    if (Array.isArray(result) && result.length > 0) {
+      let total = 0n;
+      for (const acct of result) {
+        const bal = acct.balance || acct.total_balance || '0';
+        total += BigInt(bal);
+      }
+      if (total > 0n) return total.toString();
+    }
+  }
+  if (Array.isArray(addresses) && addresses.length > 0) {
+    const BATCH_SIZE = 50;
+    let total = 0n;
+    for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+      const batch = addresses.slice(i, i + BATCH_SIZE);
+      const result = await koiosPost(`${koiosUrl}/address_info`, {
+        _addresses: batch,
+      }, id);
+      if (Array.isArray(result)) {
+        for (const entry of result) {
+          total += BigInt(entry.balance || '0');
+        }
+      }
+    }
+    return total.toString();
+  }
+  return '0';
+}
+
+function detectLpInfo(policyId, assetName) {
+  const known = KNOWN_DEX_LP.find(d => d.policyId === policyId);
+  if (!known) return null;
+  return { dex: known.dex, label: known.label, poolKey: (policyId + (assetName || '')).toLowerCase() };
+}
+
+function detectProtocolToken(policyId) {
+  return KNOWN_PROTOCOL_TOKENS.find(t => t.policyId === policyId) || null;
+}
+
+function tokenPriceKey(policyId, assetName) {
+  return ((policyId || '') + (assetName || '')).toLowerCase();
+}
+
+async function fetchMinswapPools() {
+  const id = 'mp-' + reqId();
+  try {
+    const resp = await fetch(
+      'https://api.minswap.org/v2/pools?page=1&pageSize=1000',
+      { signal: AbortSignal.timeout(15000) }
+    );
+    if (!resp.ok) {
+      log(id, 'fetch-fail', { status: resp.status });
+      return { pools: [], lpMap: {} };
+    }
+    const json = await resp.json();
+    const poolArr = Array.isArray(json) ? json : (json.pools || json.data || []);
+    log(id, 'pools', { count: poolArr.length });
+
+    const priceMap = {};
+    const lpMap = {};
+
+    for (const pool of poolArr) {
+      try {
+        const poolId = pool.id || pool.poolId || pool.pool_id || '';
+        const assetA = pool.assetA || pool.assetAIn || pool.asset_a || {};
+        const assetB = pool.assetB || pool.assetBIn || pool.asset_b || {};
+        const reserveA = pool.reserveA || pool.reserve_a || '0';
+        const reserveB = pool.reserveB || pool.reserve_b || '0';
+        const totalLP = pool.totalLPSupply || pool.total_lp_supply || pool.totalLiquidity || '0';
+
+        const ra = BigInt(reserveA);
+        const rb = BigInt(reserveB);
+        const tl = BigInt(totalLP);
+        if (ra <= 0n || rb <= 0n || tl <= 0n) continue;
+
+        const keyA = tokenPriceKey(assetA.policyId, assetA.assetName);
+        const keyB = tokenPriceKey(assetB.policyId, assetB.assetName);
+        const isAdaA = !assetA.policyId;
+        const isAdaB = !assetB.policyId;
+
+        if (isAdaB && !isAdaA) {
+          priceMap[keyA] = (Number(ra) / 1e6) / (Number(rb) / 1e6);
+        } else if (isAdaA && !isAdaB) {
+          priceMap[keyB] = (Number(rb) / 1e6) / (Number(ra) / 1e6);
+        }
+
+        if (poolId) {
+          const lpKey = (KNOWN_DEX_LP[0].policyId + poolId).toLowerCase();
+          lpMap[lpKey] = {
+            poolId,
+            assetA, assetB,
+            reserveA: ra.toString(),
+            reserveB: rb.toString(),
+            totalLPSupply: tl.toString(),
+            priceA: priceMap[keyA] || null,
+            priceB: priceMap[keyB] || null,
+          };
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    log(id, 'prices', { tokens: Object.keys(priceMap).length, lpPools: Object.keys(lpMap).length });
+    return { pools: poolArr, priceMap, lpMap };
+  } catch (e) {
+    log(id, 'error', { msg: e.message });
+    return { pools: [], priceMap: {}, lpMap: {} };
+  }
+}
+
+function calculateLpValue(lpData, lpBalance, lpDecimals) {
+  if (!lpData) return null;
+  try {
+    const totalLP = BigInt(lpData.totalLPSupply);
+    if (totalLP <= 0n) return null;
+    const lpShare = Number(BigInt(lpBalance)) / Number(totalLP);
+
+    const rA = Number(BigInt(lpData.reserveA)) / 1e6;
+    const rB = Number(BigInt(lpData.reserveB)) / 1e6;
+
+    const valA = lpData.priceA != null ? rA * lpData.priceA : rA;
+    const valB = lpData.priceB != null ? rB * lpData.priceB : rB;
+
+    return lpShare * (valA + valB);
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req, res) {
@@ -127,27 +277,26 @@ export default async function handler(req, res) {
 
   try {
     const { addresses, stakeAddresses } = req.body;
-    if (!stakeAddresses || !Array.isArray(stakeAddresses) || stakeAddresses.length === 0) {
-      return res.status(400).json({ error: 'stakeAddresses required' });
+    if ((!stakeAddresses || !Array.isArray(stakeAddresses) || stakeAddresses.length === 0) &&
+        (!addresses || !Array.isArray(addresses) || addresses.length === 0)) {
+      return res.status(400).json({ error: 'stakeAddresses or addresses required' });
     }
 
     const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
     const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
 
-    let adaBalance = '0';
+    const [adaBalance, { priceMap, lpMap }] = await Promise.all([
+      fetchAdaBalance(stakeAddresses, addresses, koiosUrl, id),
+      fetchMinswapPools(),
+    ]);
 
-    const adaResult = await koiosPost(`${koiosUrl}/account_info`, {
-      _stake_addresses: stakeAddresses,
-    }, id);
-    if (Array.isArray(adaResult) && adaResult.length > 0) {
-      adaBalance = adaResult[0].balance || '0';
-    }
+    const adaInAda = Number(adaBalance) / 1e6;
 
+    let tokens = [], lpPositions = [];
     const assetsResult = await koiosPost(`${koiosUrl}/account_assets`, {
       _stake_addresses: stakeAddresses,
     }, id);
 
-    let tokens = [];
     if (Array.isArray(assetsResult)) {
       const raw = assetsResult.filter(a => a.quantity && BigInt(a.quantity) > 0n);
       const unique = {};
@@ -165,7 +314,8 @@ export default async function handler(req, res) {
         entries.map(e => fetchAssetMeta(e.policyId, e.assetName).catch(() => null))
       );
 
-      tokens = entries.map((e, i) => {
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
         const meta = metaResults[i] || {};
         const rawQty = BigInt(e.quantity);
         const decimals = meta.decimals != null ? meta.decimals : 0;
@@ -173,7 +323,16 @@ export default async function handler(req, res) {
         const displayQty = divisor > 0n && rawQty >= divisor
           ? (Number(rawQty) / Number(divisor)).toLocaleString(undefined, { maximumFractionDigits: decimals || 6 })
           : rawQty.toString();
-        return {
+
+        const pKey = tokenPriceKey(e.policyId, e.assetName);
+        const priceInAda = priceMap[pKey] || null;
+        const wholeAmt = Number(rawQty) / Math.pow(10, decimals);
+        const valueAda = priceInAda != null ? wholeAmt * priceInAda : null;
+        const valueAdaFormatted = valueAda != null
+          ? valueAda.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : null;
+
+        const token = {
           policyId: e.policyId,
           assetName: e.assetName,
           fingerprint: e.fingerprint,
@@ -183,20 +342,54 @@ export default async function handler(req, res) {
           name: meta.name || null,
           ticker: meta.ticker || null,
           image: meta.image || null,
+          priceInAda,
+          valueAda: valueAda != null ? Math.round(valueAda * 100) / 100 : null,
+          valueAdaFormatted,
         };
-      });
 
-      tokens.sort((a, b) => {
-        const aQty = BigInt(a.quantity);
-        const bQty = BigInt(b.quantity);
-        if (bQty > aQty) return 1;
-        if (bQty < aQty) return -1;
-        return 0;
-      });
+        const lpInfo = detectLpInfo(e.policyId, e.assetName);
+        if (lpInfo) {
+          let lpValue = null;
+          if (lpInfo.dex === 'Minswap V2') {
+            const lpData = lpMap[lpInfo.poolKey] || null;
+            lpValue = calculateLpValue(lpData, e.quantity, decimals);
+          }
+          token.lpInfo = lpInfo;
+          token.lpValueAda = lpValue;
+          token.lpValueFormatted = lpValue != null
+            ? lpValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : null;
+          lpPositions.push(token);
+        } else {
+          const proto = detectProtocolToken(e.policyId);
+          if (proto) {
+            token.protocolToken = proto;
+            if (!token.ticker) token.ticker = proto.ticker;
+            if (!token.name) token.name = proto.name;
+          }
+          tokens.push(token);
+        }
+      }
+
+      tokens.sort((a, b) => (b.valueAda || 0) - (a.valueAda || 0));
+      lpPositions.sort((a, b) => (b.lpValueAda || 0) - (a.lpValueAda || 0));
     }
 
-    log(id, 'done', { ada: adaBalance, tokens: tokens.length });
-    return res.json({ adaBalance, tokens });
+    const tokenTotal = tokens.reduce((s, t) => s + (t.valueAda || 0), 0);
+    const lpTotal = lpPositions.reduce((s, t) => s + (t.lpValueAda || 0), 0);
+    const netWorthAda = Math.round((adaInAda + tokenTotal + lpTotal) * 100) / 100;
+    const netWorthFormatted = netWorthAda.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    log(id, 'done', { ada: adaBalance, tokens: tokens.length, lp: lpPositions.length, netWorth: netWorthFormatted });
+    return res.json({
+      adaBalance,
+      adaInAda: Math.round(adaInAda * 100) / 100,
+      tokens,
+      lpPositions,
+      netWorthAda,
+      netWorthFormatted,
+      pricesUpdatedAt: priceMap && Object.keys(priceMap).length > 0 ? new Date().toISOString() : null,
+    });
   } catch (error) {
     log('pf-err', 'catch', { msg: error.message });
     return res.status(500).json({ error: error.message });

@@ -379,6 +379,7 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 
 .tab:hover { color: var(--text); }
 .tab-active { color: var(--primary); border-bottom-color: var(--primary); }
+.badge-beta { font-size: 0.55rem; padding: 0.05rem 0.3rem; vertical-align: middle; background: var(--primary); color: #fff; }
 
 /* ---------- Portfolio ---------- */
 
@@ -410,6 +411,22 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 .pf-ada .pf-name { color: var(--primary); }
 
 .pf-token-list { margin-top: 0.5rem; }
+
+.pf-section-title {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text3); margin: 0 0 0.35rem 0;
+}
+
+.pf-lp-card { border-color: var(--accent-light); border-style: dashed; }
+
+.pf-lp-balance { color: var(--accent); }
+
+.pf-tag {
+  display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 0.05rem 0.35rem;
+  border-radius: 3px; vertical-align: middle; margin-left: 0.25rem;
+}
+
+.pf-tag-lp { background: var(--accent-bg); color: var(--accent); }
 
 .footer {
   text-align: center; padding: 1.5rem 1.25rem 1rem;

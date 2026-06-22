@@ -1040,10 +1040,32 @@ function renderPortfolio(data) {
       </div>
     </div>`;
 
+  if (data.lpPositions && data.lpPositions.length > 0) {
+    html += '<h3 class="pf-section-title">Liquidity Positions</h3><div class="pf-token-list">';
+    for (const t of data.lpPositions) {
+      const label = t.ticker || t.name || (t.fingerprint ? shorten(t.fingerprint, 5) : shorten(t.policyId, 5));
+      const dexTag = t.lpInfo ? ` <span class="pf-tag pf-tag-lp">${escHtml(t.lpInfo.dex)}</span>` : '';
+      const poolInfo = t.lpInfo && t.lpInfo.poolLabel ? `<div class="pf-sub">Pool: ${escHtml(shorten(t.lpInfo.poolLabel, 8))}</div>` : '';
+      const imgSrc = t.image || null;
+      const imgHtml = imgSrc ? `<img class="pf-logo" src="${escHtml(imgSrc)}" alt="">` : '<div class="pf-logo pf-logo-placeholder"></div>';
+      html += `
+        <div class="pf-card pf-lp-card">
+          <div class="pf-card-header">
+            ${imgHtml}
+            <span class="pf-name">${escHtml(label)}${dexTag}</span>
+            <span class="pf-balance pf-lp-balance">${escHtml(t.displayQty)}</span>
+          </div>
+          ${poolInfo}
+          <div class="pf-sub">${escHtml(shorten(t.fingerprint || t.policyId, 6))}</div>
+        </div>`;
+    }
+    html += '</div>';
+  }
+
   if (data.tokens.length === 0) {
     html += '<div class="empty-state" style="margin-top:0.75rem"><p>No native tokens found.</p></div>';
   } else {
-    html += '<div class="pf-token-list">';
+    html += '<h3 class="pf-section-title" style="margin-top:0.75rem">Tokens</h3><div class="pf-token-list">';
     for (const t of data.tokens) {
       const label = t.ticker || t.name || (t.fingerprint ? shorten(t.fingerprint, 5) : shorten(t.policyId, 5));
       const imgSrc = t.image || (() => {
