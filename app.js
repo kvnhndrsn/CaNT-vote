@@ -200,17 +200,21 @@ function renderProposals() {
 
     let tallyHtml = '';
     if (choices.length > 0) {
-      const supply = p.circulatingSupply
-        ? BigInt(p.circulatingSupply)
-        : isADA ? 45_000_000_000_000_000n : null;
-      const pct = supply ? supplyPct(total.toString(), supply.toString()) : null;
+      const totalS = p.totalSupply ? BigInt(p.totalSupply) : null;
+      const circS = p.circulatingSupply ? BigInt(p.circulatingSupply) : null;
+      const totalPct = totalS ? supplyPct(total.toString(), totalS.toString()) : null;
+      const circPct = circS && circS !== totalS ? supplyPct(total.toString(), circS.toString()) : null;
       const unit = isADA ? 'lovelace' : p.tokenName || (p.target_asset_name || '');
+      const pctParts = [];
+      if (totalPct) pctParts.push(totalPct + ' of total');
+      if (circPct) pctParts.push(circPct + ' of circ');
+      const pctStr2 = pctParts.length > 0 ? ' · ' + pctParts.join(' · ') : '';
       tallyHtml = `
         <div class="card-tally">
           <div class="card-tally-row">
             ${pieSvg(choices, total.toString())}
             <span class="card-tally-label">${choices.map(([c, w]) => `${escHtml(c)} ${formatWeight(w)} ${escHtml(unit)} (${pctStr(w, total.toString())})`).join(' · ')}</span>
-            <span class="card-tally-pct">${formatWeight(total.toString())} ${escHtml(unit)}${pct ? ` · ${pct}` : ''}</span>
+            <span class="card-tally-pct">${formatWeight(total.toString())} ${escHtml(unit)}${pctStr2}</span>
           </div>
         </div>
       `;
@@ -466,13 +470,12 @@ async function openVoteModal(proposalId) {
       ? shorten(proposal.target_policy_id, 6) + '.' + proposal.target_asset_name
       : shorten(proposal.target_policy_id, 6)));
 
-    const totalAdaSupply = 45_000_000_000_000_000n;
-    const supply = isADA
-      ? totalAdaSupply
-      : (proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null);
-    const supplyInfo = supply
-      ? `Supply: ${formatWeight(supply.toString())}`
-      : '';
+    const totalS = proposal.totalSupply ? BigInt(proposal.totalSupply) : null;
+    const circS = proposal.circulatingSupply ? BigInt(proposal.circulatingSupply) : null;
+    const supplyInfo = [];
+    if (totalS) supplyInfo.push('total: ' + formatWeight(totalS.toString()));
+    if (circS && circS !== totalS) supplyInfo.push('circ: ' + formatWeight(circS.toString()));
+    else if (totalS) supplyInfo.push('supply: ' + formatWeight(totalS.toString()));
     const unitLabel = isADA ? 'lovelace' : tokenLabel;
 
     const localLogo = tokenLogo(proposal.target_policy_id);
@@ -483,7 +486,7 @@ async function openVoteModal(proposalId) {
 
     $('#voteTokenInfo').innerHTML = `
       ${imgHtml}
-      <span>${escHtml(tokenLabel)}${supplyInfo ? ' &middot; ' + supplyInfo : ''}</span>
+      <span>${escHtml(tokenLabel)}${supplyInfo.length > 0 ? ' &middot; ' + supplyInfo.join(' &middot; ') : ''}</span>
     `;
 
     const optionsDiv = $('#voteOptions');
@@ -492,15 +495,24 @@ async function openVoteModal(proposalId) {
 
     const myChoice = proposal.myVote?.vote_choice;
 
+    function choiceSupplyPct(w, s) {
+      if (!s || s <= 0n) return '';
+      return (Number(BigInt(w)) / Number(s) * 100).toFixed(2) + '%';
+    }
+
     optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
       const isMyVote = c === myChoice;
       const weight = tally[c];
-      const pct = weight && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
-      const supplyPct = weight && supply && supply > 0n
-        ? ' (' + (Number(BigInt(weight)) / Number(supply) * 100).toFixed(2) + '% of supply)'
-        : '';
+      const w = weight ? BigInt(weight) : null;
+      const pct = w && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
+      const totalPctStr = w && totalS ? choiceSupplyPct(weight, totalS) : null;
+      const circPctStr = w && circS && circS !== totalS ? choiceSupplyPct(weight, circS) : null;
+      const supplyParts = [];
+      if (totalPctStr) supplyParts.push(totalPctStr + ' of total');
+      if (circPctStr) supplyParts.push(circPctStr + ' of circ');
+      const supplyStr = supplyParts.length > 0 ? ' (' + supplyParts.join(' · ') + ')' : '';
       const label = weight
-        ? `${escHtml(c)}: ${formatWeight(weight)} ${escHtml(unitLabel)} (${pct.toFixed(1)}%)${supplyPct}`
+        ? `${escHtml(c)}: ${formatWeight(weight)} ${escHtml(unitLabel)} (${pct.toFixed(1)}%)${supplyStr}`
         : escHtml(c);
       return `
         <label class="vote-option${isMyVote ? ' selected' : ''}" data-choice="${escHtml(c)}">

@@ -149,6 +149,23 @@ async function fetchAssetInfo(assetPolicy, assetName) {
   return { supply, name, image };
 }
 
+async function fetchAdaSupply() {
+  const id = 'ada-supply-' + reqId();
+  const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
+  const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
+  try {
+    const result = await koiosGet(`${koiosUrl}/totals`);
+    if (Array.isArray(result) && result.length > 0) {
+      const circulating = result[0].circulating_supply;
+      log(id, 'done', { circulating });
+      return circulating;
+    }
+  } catch (e) {
+    log(id, 'error', { msg: e.message });
+  }
+  return null;
+}
+
 async function fetchLatestBlock() {
   const id = 'block-' + reqId();
   const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
@@ -305,10 +322,13 @@ export default async function handler(req, res) {
           if (myVoteData) myVote = myVoteData;
         }
 
+        const isADA = !proposal.target_policy_id;
         const assetId = formatAssetId(proposal);
         const assetInfo = assetId
           ? await fetchAssetInfo(proposal.target_policy_id, proposal.target_asset_name)
           : null;
+        let adaCirculating = null;
+        if (isADA) adaCirculating = await fetchAdaSupply();
 
         return res.json({
           ...proposal,
@@ -316,7 +336,8 @@ export default async function handler(req, res) {
           totalWeight: totalWeight.toString(),
           tally: formattedTally,
           myVote,
-          circulatingSupply: assetInfo?.supply || null,
+          circulatingSupply: isADA ? adaCirculating : (assetInfo?.supply || null),
+          totalSupply: isADA ? '45000000000000000' : (assetInfo?.supply || null),
           tokenName: assetInfo?.name || null,
           tokenImage: assetInfo?.image || null,
         });
@@ -365,6 +386,11 @@ export default async function handler(req, res) {
         if (info) assetInfos[id] = info;
       }));
 
+      let adaCirculating = null;
+      if (active.some(p => !p.target_policy_id)) {
+        adaCirculating = await fetchAdaSupply();
+      }
+
       active.forEach(p => {
         addExpiry(p);
         const s = summaries[p.id] || {};
@@ -378,7 +404,9 @@ export default async function handler(req, res) {
         p.totalVoteWeight = total.toString();
         const assetId = formatAssetId(p);
         const ai = assetInfos[assetId] || {};
-        p.circulatingSupply = ai.supply || null;
+        const isADA = !p.target_policy_id;
+        p.circulatingSupply = isADA ? adaCirculating : (ai.supply || null);
+        p.totalSupply = isADA ? '45000000000000000' : (ai.supply || null);
         p.tokenName = ai.name || null;
         p.tokenImage = ai.image || null;
       });
