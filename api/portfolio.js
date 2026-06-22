@@ -115,11 +115,7 @@ async function fetchAssetMeta(policyId, assetName) {
 }
 
 const KNOWN_DEX_LP = [
-  { policyId: 'e4214b7cce62ac8f3f03c1eac401f3b7676f6c4e0fc0b9a6e7c6c3b', dex: 'Minswap V2', label: 'Minswap LP' },
-  { policyId: '2adaf209a1fab4acd96c80d385d8da55d64f2ce2fa88b1b5a2a8365e', dex: 'SundaeSwap', label: 'Sundae LP' },
-  { policyId: 'f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a', dex: 'WingRiders', label: 'WingRiders LP' },
-  { policyId: '8482d2af53f8e565c1a54843ced2783b4ed7e6996e7051b71818e7d0', dex: 'VyFinance', label: 'VyFinance LP' },
-  { policyId: '2e27fc257632c77e7337c4984355ef11a1285ee6f84a769f029a1a59', dex: 'Minswap V1', label: 'Minswap V1 LP' },
+  { policyId: 'f5808c2c990d86da54bfc97d89cee6efa20cd8461616359478d96b4c', dex: 'Minswap V2', label: 'Minswap LP' },
 ];
 
 const KNOWN_PROTOCOL_TOKENS = [
@@ -177,6 +173,24 @@ function tokenPriceKey(policyId, assetName) {
   return ((policyId || '') + (assetName || '')).toLowerCase();
 }
 
+function parsePoolAsset(assetField) {
+  if (!assetField || typeof assetField === 'string') {
+    const str = assetField || '';
+    if (str === 'lovelace' || str === '') return { policyId: null, assetName: null };
+    const assetId = str.replace(/^0x/, '');
+    if (assetId.length >= 56) {
+      return { policyId: assetId.slice(0, 56), assetName: assetId.slice(56) || '' };
+    }
+    return { policyId: assetId, assetName: '' };
+  }
+  if (typeof assetField === 'object') {
+    const policyId = assetField.policyId || assetField.policy_id || null;
+    const assetName = assetField.assetName || assetField.asset_name || assetField.name || '';
+    return { policyId: policyId || null, assetName: assetName || '' };
+  }
+  return { policyId: null, assetName: null };
+}
+
 async function fetchMinswapPools() {
   const id = 'mp-' + reqId();
   try {
@@ -192,16 +206,21 @@ async function fetchMinswapPools() {
     const poolArr = Array.isArray(json) ? json : (json.pools || json.data || []);
     log(id, 'pools', { count: poolArr.length });
 
+    if (poolArr.length > 0) {
+      const first = poolArr[0];
+      log(id, 'pool-sample', { keys: Object.keys(first), id: first.id || first.poolId || '(missing)' });
+    }
+
     const priceMap = {};
     const lpMap = {};
 
     for (const pool of poolArr) {
       try {
         const poolId = pool.id || pool.poolId || pool.pool_id || '';
-        const assetA = pool.assetA || pool.assetAIn || pool.asset_a || {};
-        const assetB = pool.assetB || pool.assetBIn || pool.asset_b || {};
-        const reserveA = pool.reserveA || pool.reserve_a || '0';
-        const reserveB = pool.reserveB || pool.reserve_b || '0';
+        const assetA = parsePoolAsset(pool.assetA || pool.assetAIn || pool.asset_a);
+        const assetB = parsePoolAsset(pool.assetB || pool.assetBIn || pool.asset_b);
+        const reserveA = pool.reserveA || pool.reserveAIn || pool.reserve_a || '0';
+        const reserveB = pool.reserveB || pool.reserveBIn || pool.reserve_b || '0';
         const totalLP = pool.totalLPSupply || pool.total_lp_supply || pool.totalLiquidity || '0';
 
         const ra = BigInt(reserveA);
@@ -290,6 +309,8 @@ export default async function handler(req, res) {
       fetchMinswapPools(),
     ]);
 
+    log(id, 'prices-status', { priceCount: Object.keys(priceMap).length, lpCount: Object.keys(lpMap).length });
+
     const adaInAda = Number(adaBalance) / 1e6;
 
     let tokens = [], lpPositions = [];
@@ -308,7 +329,7 @@ export default async function handler(req, res) {
         unique[key].quantity = (BigInt(unique[key].quantity) + BigInt(a.quantity)).toString();
       }
       const entries = Object.values(unique);
-      log(id, 'unique-tokens', { count: entries.length });
+      log(id, 'unique-tokens', { count: entries.length, policies: entries.map(e => e.policyId + '.' + (e.assetName || '').slice(0, 12) + '..') });
 
       const metaResults = await Promise.all(
         entries.map(e => fetchAssetMeta(e.policyId, e.assetName).catch(() => null))
