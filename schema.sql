@@ -8,8 +8,6 @@ CREATE TABLE proposals (
     target_asset_name VARCHAR(128) NOT NULL DEFAULT '',
     target_fingerprint VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    snapshot_block BIGINT NOT NULL,
-    snapshot_slot BIGINT NOT NULL DEFAULT 0,
     creator_address VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active'
 );
@@ -30,21 +28,3 @@ CREATE INDEX idx_votes_proposal_id ON votes(proposal_id);
 CREATE INDEX idx_proposals_target_asset ON proposals(target_policy_id, target_asset_name);
 CREATE INDEX idx_proposals_status ON proposals(status);
 
-ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public can view proposals"
-    ON proposals FOR SELECT
-    USING (true);
-
-CREATE POLICY "Authenticated users can create proposals"
-    ON proposals FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Public can view votes"
-    ON votes FOR SELECT
-    USING (true);
-
-CREATE POLICY "Authenticated users can insert votes"
-    ON votes FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');

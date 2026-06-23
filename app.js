@@ -446,7 +446,7 @@ function containsProfanity(text) {
   if (!text || typeof text !== 'string') return false;
   const words = [
     'fuck', 'fucking', 'fucked', 'fucker', 'fuckers',
-    'shit', 'shitting', 'shite',
+    'shit', 'shitting', 'shitted', 'shite',
     'asshole', 'assholes', 'bastard', 'bastards',
     'bitch', 'bitches', 'bitching',
     'cocksucker', 'cocksuckers',
@@ -458,6 +458,14 @@ function containsProfanity(text) {
     'cunt', 'cunts',
     'whore', 'whores',
     'slut', 'sluts',
+    'piss', 'pissing', 'pissed',
+    'twat', 'twats',
+    'wank', 'wanker', 'wankers',
+    'damn', 'damnit',
+    'goddamn', 'goddamnit',
+    'bullshit',
+    'jackass', 'jackasses',
+    'douche', 'douchebag', 'douchebags',
   ];
   const lower = text.toLowerCase().trim();
   for (const w of words) {
@@ -819,10 +827,9 @@ async function openAuditModal(proposalId) {
 
     const jsonStr = JSON.stringify(data, null, 2);
     $('#copyAuditBtn').onclick = () => {
-      navigator.clipboard.writeText(jsonStr).then(
-        () => toast('Audit JSON copied', 'success'),
-        () => toast('Failed to copy', 'error'),
-      );
+      copyToClipboard(jsonStr)
+        .then(() => toast('Audit JSON copied', 'success'))
+        .catch(() => toast('Failed to copy', 'error'));
     };
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1000,6 +1007,27 @@ function initTheme() {
 }
 
 /* ---------- Utils ---------- */
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      if (document.execCommand('copy')) resolve();
+      else reject(new Error('Copy command failed'));
+    } catch (e) {
+      reject(e);
+    }
+    document.body.removeChild(ta);
+  });
+}
 
 document.addEventListener('error', (e) => {
   if (e.target.tagName === 'IMG') e.target.style.display = 'none';
