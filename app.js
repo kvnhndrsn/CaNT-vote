@@ -1276,6 +1276,76 @@ $$('.tab').forEach(tab => {
   });
 });
 
+/* ---------- Epoch ---------- */
+
+let epochInterval = null;
+let epochTickInterval = null;
+let epochData = null;
+
+const EPOCH_SLOTS = 432000;
+
+function epochSvg() {
+  return '<svg class="epoch-icon" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="var(--accent)" stroke-width="2"/><path d="M16 6v10l7 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>';
+}
+
+async function fetchEpoch() {
+  try {
+    const res = await fetch('/api/epoch');
+    if (!res.ok) return;
+    const data = await res.json();
+    data.fetchedAt = Date.now();
+    epochData = data;
+    renderEpoch();
+  } catch {
+    if (!epochData) {
+      $('#epochBar').innerHTML = '<div class="epoch-error">Could not load epoch info</div>';
+    }
+  }
+}
+
+function renderEpoch() {
+  if (!epochData) return;
+  const now = Date.now();
+  const elapsed = (now - epochData.fetchedAt) / 1000;
+  const remaining = Math.max(0, epochData.remainingSeconds - elapsed);
+  const progress = ((EPOCH_SLOTS - remaining) / EPOCH_SLOTS) * 100;
+
+  const fmt = epochCountdown(remaining);
+
+  $('#epochBar').innerHTML = `
+    <div class="epoch-card">
+      <div class="epoch-badge">
+        ${epochSvg()}
+        <span class="epoch-number">Epoch ${epochData.epochNo}</span>
+      </div>
+      <div class="epoch-bar-wrap">
+        <div class="epoch-bar-track">
+          <div class="epoch-bar-fill" style="width:${Math.min(progress, 100)}%"></div>
+        </div>
+        <span class="epoch-pct">${progress.toFixed(1)}%</span>
+      </div>
+      <span class="epoch-countdown">${fmt}</span>
+    </div>
+  `;
+}
+
+function epochCountdown(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (d > 0) return d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
+  if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
+}
+
+function startEpochTicker() {
+  fetchEpoch();
+  epochInterval = setInterval(fetchEpoch, 60000);
+  epochTickInterval = setInterval(renderEpoch, 1000);
+}
+
 /* ---------- Init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1283,6 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateWalletUI();
   fetchProposals();
   startTicker();
+  startEpochTicker();
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);
