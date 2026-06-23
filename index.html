@@ -26,6 +26,7 @@
   <div class="tabs">
     <button class="tab tab-active" data-view="proposals">Proposals</button>
     <button class="tab" data-view="portfolio">Portfolio <span class="badge badge-beta">Beta</span></button>
+    <button class="tab" data-view="surf">Surf Lending <span class="badge badge-beta">Beta</span></button>
   </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
@@ -39,6 +40,30 @@
   <div id="portfolioView" style="display:none">
     <div class="section-title">Portfolio</div>
     <div id="portfolioContent"></div>
+  </div>
+  <div id="surfView" style="display:none">
+    <div class="surf-header">
+      <div class="section-title">
+        <span>Surf Lending Dashboard</span>
+        <span class="badge badge-surf">Live</span>
+      </div>
+      <div class="surf-summary" id="surfSummary"></div>
+    </div>
+    <div class="surf-filters">
+      <input type="text" id="surfAddressFilter" placeholder="Filter by address..." class="surf-input">
+      <select id="surfPoolFilter" class="surf-input">
+        <option value="">All Pools</option>
+      </select>
+      <select id="surfStatusFilter" class="surf-input">
+        <option value="">All Positions</option>
+        <option value="healthy">Healthy</option>
+        <option value="warning">At Risk</option>
+        <option value="danger">Liquidatable</option>
+      </select>
+    </div>
+    <div id="surfContent">
+      <div class="empty-state"><p>Loading Surf positions...</p></div>
+    </div>
   </div>
 </main>
 

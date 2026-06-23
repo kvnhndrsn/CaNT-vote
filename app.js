@@ -1266,6 +1266,7 @@ $$('.tab').forEach(tab => {
     const view = tab.dataset.view;
     $('#mainView').style.display = view === 'proposals' ? '' : 'none';
     $('#portfolioView').style.display = view === 'portfolio' ? '' : 'none';
+    $('#surfView').style.display = view === 'surf' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
         $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
@@ -1273,7 +1274,223 @@ $$('.tab').forEach(tab => {
         fetchPortfolio();
       }
     }
+    if (view === 'surf') {
+      fetchSurfDashboard();
+    }
   });
+});
+
+/* ---------- Surf Lending Dashboard ---------- */
+
+const SURF_COLORS = {
+  healthy: '#22c55e',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+};
+
+let surfData = null;
+let surfFilterAddr = '';
+let surfFilterPool = '';
+let surfFilterStatus = '';
+let surfRefreshInterval = null;
+
+async function fetchSurfDashboard() {
+  const container = $('#surfContent');
+  try {
+    const params = new URLSearchParams();
+    if (surfFilterAddr) params.set('address', surfFilterAddr);
+    const res = await fetch('/api/surf-dashboard?' + params.toString());
+    if (!res.ok) throw new Error((await res.json()).error);
+    surfData = await res.json();
+    renderSurfDashboard();
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state"><strong>Could not load Surf data</strong><p>' + escHtml(e.message) + '</p></div>';
+  }
+}
+
+function renderSurfDashboard() {
+  if (!surfData) return;
+  const { pools, positions, summary } = surfData;
+
+  renderSurfSummary(summary);
+  renderSurfPoolFilter(pools);
+  renderSurfPositions(positions, pools, summary);
+}
+
+function renderSurfSummary(summary) {
+  const el = $('#surfSummary');
+  const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  el.innerHTML = `
+    <div class="surf-summary-grid">
+      <div class="surf-stat">
+        <span class="surf-stat-label">Total Borrowed</span>
+        <span class="surf-stat-value">${fmtUSD(summary.totalBorrowedUSD)}</span>
+      </div>
+      <div class="surf-stat">
+        <span class="surf-stat-label">Total Collateral</span>
+        <span class="surf-stat-value">${fmtUSD(summary.totalCollateralUSD)}</span>
+      </div>
+      <div class="surf-stat">
+        <span class="surf-stat-label">Net Position Value</span>
+        <span class="surf-stat-value ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(summary.totalNetValueUSD)}</span>
+      </div>
+      <div class="surf-stat">
+        <span class="surf-stat-label">Open Positions</span>
+        <span class="surf-stat-value">${summary.totalPositions}</span>
+      </div>
+      <div class="surf-stat">
+        <span class="surf-stat-label">SURF Price</span>
+        <span class="surf-stat-value">${fmtUSD(summary.surfPrice)}</span>
+      </div>
+      <div class="surf-stat">
+        <span class="surf-stat-label">ADA Price</span>
+        <span class="surf-stat-value">${fmtUSD(summary.adaPrice)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderSurfPoolFilter(pools) {
+  const sel = $('#surfPoolFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Pools</option>';
+  const seen = new Set();
+  for (const p of pools) {
+    const label = p.asset.ticker + (p.collateralAssets.length > 0 ? '/' + p.collateralAssets[0].ticker : '');
+    if (seen.has(label)) continue;
+    seen.add(label);
+    sel.innerHTML += `<option value="${escHtml(p.poolId)}">${escHtml(label)}</option>`;
+  }
+  sel.value = current;
+}
+
+function renderSurfPositions(positions, pools, summary) {
+  const container = $('#surfContent');
+
+  let filtered = [...positions];
+
+  if (surfFilterAddr) {
+    const q = surfFilterAddr.toLowerCase();
+    filtered = filtered.filter(p => p.address.toLowerCase().includes(q));
+  }
+  if (surfFilterPool) {
+    filtered = filtered.filter(p => p.poolId === surfFilterPool);
+  }
+  if (surfFilterStatus) {
+    filtered = filtered.filter(p => {
+      const ltv = p.ltv || 0;
+      if (surfFilterStatus === 'healthy') return ltv < 0.5;
+      if (surfFilterStatus === 'warning') return ltv >= 0.5 && ltv < 0.75;
+      if (surfFilterStatus === 'danger') return ltv >= 0.75;
+      return true;
+    });
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No positions match your filters.</p></div>';
+    return;
+  }
+
+  const fmtADA = (v, d) => (v / Math.pow(10, d || 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
+  const fmtDate = (ts) => {
+    if (!ts) return 'Unknown';
+    const d = new Date(ts);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+  };
+  const fmtTime = (years) => {
+    if (years < 0.00274) return Math.floor(years * 8766) + 'h';
+    if (years < 0.0833) return Math.floor(years * 30.44) + 'd';
+    if (years < 1) return Math.floor(years * 12) + 'mo';
+    return years.toFixed(1) + 'y';
+  };
+
+  function healthClass(ltv) {
+    if (ltv >= 0.75) return 'surf-health-danger';
+    if (ltv >= 0.5) return 'surf-health-warning';
+    return 'surf-health-ok';
+  }
+
+  function healthLabel(ltv) {
+    if (ltv >= 0.75) return 'Liquidatable';
+    if (ltv >= 0.5) return 'At Risk';
+    return 'Healthy';
+  }
+
+  let html = `<div class="surf-count">${filtered.length} position${filtered.length !== 1 ? 's' : ''}</div>`;
+  html += '<div class="surf-position-list">';
+
+  for (const p of filtered) {
+    const pool = pools ? pools.find(po => po.poolId === p.poolId) : null;
+    const poolName = pool ? (pool.asset.ticker + (pool.collateralAssets.length > 0 ? '/' + pool.collateralAssets[0].ticker : '')) : p.poolId.slice(0, 16) + '..';
+    const health = healthClass(p.ltv);
+    const hLabel = healthLabel(p.ltv);
+
+    html += `
+      <div class="surf-position-card ${health}">
+        <div class="surf-pos-header">
+          <div class="surf-pos-pool">
+            <span class="surf-pos-pool-name">${escHtml(poolName)}</span>
+            <span class="surf-pos-address">${escHtml(shorten(p.address, 8))}</span>
+          </div>
+          <div class="surf-pos-health">
+            <span class="surf-health-badge ${health}">${escHtml(hLabel)}</span>
+            <span class="surf-ltv">LTV: ${fmtPct(p.ltv)}</span>
+          </div>
+        </div>
+        <div class="surf-pos-body">
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">Collateral</span>
+            <span class="surf-detail-value">${fmtADA(p.collateral, p.collateralDecimals)} ${escHtml(p.collateralTicker)}</span>
+            <span class="surf-detail-usd">${fmtUSD(p.collateralValueUSD)}</span>
+          </div>
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">Borrow</span>
+            <span class="surf-detail-value">${fmtADA(p.totalOwed, p.principalDecimals)} ${escHtml(p.principalTicker)}</span>
+            <span class="surf-detail-usd">${fmtUSD(p.totalOwedUSD)}</span>
+          </div>
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">Net Value</span>
+            <span class="surf-detail-value ${p.netValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(p.netValueUSD)}</span>
+          </div>
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">APR</span>
+            <span class="surf-detail-value">${fmtPct(p.interestRate)}</span>
+          </div>
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">Duration</span>
+            <span class="surf-detail-value">${fmtTime(p.elapsedYears)}</span>
+          </div>
+          <div class="surf-pos-detail">
+            <span class="surf-detail-label">Interest Accrued</span>
+            <span class="surf-detail-value">${fmtADA(p.accruedInterest, p.principalDecimals)} ${escHtml(p.principalTicker)}</span>
+          </div>
+        </div>
+        <div class="surf-pos-footer">
+          <span class="surf-footer-meta">Opened: ${fmtDate(p.startTime)}</span>
+          <span class="surf-footer-meta">ID: ${escHtml(shorten(p.borrowId?.txHash || p.outRef?.txHash || '', 10))}</span>
+        </div>
+      </div>`;
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+$('#surfAddressFilter')?.addEventListener('input', (e) => {
+  surfFilterAddr = e.target.value;
+  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
+});
+
+$('#surfPoolFilter')?.addEventListener('change', (e) => {
+  surfFilterPool = e.target.value;
+  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
+});
+
+$('#surfStatusFilter')?.addEventListener('change', (e) => {
+  surfFilterStatus = e.target.value;
+  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
 });
 
 /* ---------- Epoch ---------- */
