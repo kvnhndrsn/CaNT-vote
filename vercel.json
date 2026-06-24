@@ -4,16 +4,6 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron-snapshot",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron-activity",
-      "schedule": "*/10 * * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",
