@@ -1612,17 +1612,16 @@ let surfSortKey = 'ltv';
 let surfSortDir = -1;
 
 const SURF_COLUMNS = [
-  { key: 'health',    label: '',        sortable: true,  align: 'center', width: 32 },
-  { key: 'pool',      label: 'Pool',    sortable: true,  align: 'left' },
-  { key: 'address',   label: 'Address', sortable: true,  align: 'left' },
-  { key: 'ltv',       label: 'LTV',     sortable: true,  align: 'right' },
-  { key: 'collateral',label: 'Collateral', sortable: true, align: 'right' },
-  { key: 'borrow',    label: 'Borrowed', sortable: true,  align: 'right' },
-  { key: 'netvalue',  label: 'Net Value',sortable: true,  align: 'right' },
-  { key: 'apr',       label: 'APR',     sortable: true,  align: 'right' },
-  { key: 'duration',  label: 'Duration',sortable: true,  align: 'right' },
-  { key: 'interest',  label: 'Interest',sortable: true,  align: 'right' },
-  { key: 'opened',    label: 'Opened',  sortable: true,  align: 'left' },
+  { key: 'pool',      label: 'Pool',      sortable: true, align: 'left' },
+  { key: 'address',   label: 'Address',   sortable: true, align: 'left' },
+  { key: 'ltv',       label: 'LTV',       sortable: true, align: 'right' },
+  { key: 'collateral',label: 'Collateral',sortable: true, align: 'right' },
+  { key: 'borrow',    label: 'Borrowed',  sortable: true, align: 'right' },
+  { key: 'netvalue',  label: 'Net Value', sortable: true, align: 'right' },
+  { key: 'apr',       label: 'APR',       sortable: true, align: 'right' },
+  { key: 'duration',  label: 'Duration',  sortable: true, align: 'right' },
+  { key: 'interest',  label: 'Interest',  sortable: true, align: 'right' },
+  { key: 'opened',    label: 'Opened',    sortable: true, align: 'left' },
 ];
 
 async function fetchSurfDashboard() {
@@ -1749,7 +1748,6 @@ function renderSurfPositions(positions, pools, summary) {
   }
 
   const sortFns = {
-    'health':    (a, b) => (a.ltv >= 0.75 ? 2 : a.ltv >= 0.5 ? 1 : 0) - (b.ltv >= 0.75 ? 2 : b.ltv >= 0.5 ? 1 : 0),
     'pool':      (a, b) => (a.principalTicker || '').localeCompare(b.principalTicker || ''),
     'address':   (a, b) => (a.address || '').localeCompare(b.address || ''),
     'ltv':       (a, b) => (a.ltv || 0) - (b.ltv || 0),
@@ -1787,12 +1785,6 @@ function renderSurfPositions(positions, pools, summary) {
     return years.toFixed(1) + 'y';
   };
 
-  function healthDot(ltv) {
-    if (ltv >= 0.75) return '<span class="surf-dot surf-dot-danger" title="Liquidatable"></span>';
-    if (ltv >= 0.5) return '<span class="surf-dot surf-dot-warning" title="At Risk"></span>';
-    return '<span class="surf-dot surf-dot-ok" title="Healthy"></span>';
-  }
-
   function poolDisplayName(pool) {
     if (!pool) return '';
     const borrowed = pool.asset.ticker;
@@ -1807,19 +1799,19 @@ function renderSurfPositions(positions, pools, summary) {
     const pName = poolDisplayName(pool);
     const liqThreshold = pool?.liquidationThresholdLTV || 0.8;
     const ltvPct = p.ltv / liqThreshold;
+    const ltvColor = p.ltv >= 0.75 ? 'surf-txt-danger' : p.ltv >= 0.5 ? 'surf-txt-warning' : 'surf-txt-ok';
 
     return {
-      health:     healthDot(p.ltv),
-      pool:       escHtml(pName),
-      address:    escHtml(shorten(p.address, 6)) + '<span class="surf-cell-sub">' + escHtml(shorten(p.address, 20)) + '</span>',
-      ltv:        `<span class="surf-ltv-cell ${p.ltv >= 0.75 ? 'surf-txt-danger' : p.ltv >= 0.5 ? 'surf-txt-warning' : 'surf-txt-ok'}">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
-      collateral: fmtADA(p.collateral, p.collateralDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.collateralTicker) + '</span><span class="surf-cell-sub">' + fmtUSD(p.collateralValueUSD) + '</span>',
-      borrow:     fmtADA(p.totalOwed, p.principalDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.principalTicker) + '</span><span class="surf-cell-sub">' + fmtUSD(p.totalOwedUSD) + '</span>',
-      netvalue:   `<span class="${p.netValueUSD < 0 ? 'surf-txt-danger' : 'surf-txt-ok'}">${fmtUSD(p.netValueUSD)}</span>`,
-      apr:        fmtPct(p.interestRate),
-      duration:   fmtTime(p.elapsedYears),
-      interest:   fmtADA(p.accruedInterest, p.principalDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.principalTicker) + '</span>',
-      opened:     fmtDate(p.startTime),
+      pool:       `<span class="surf-cell-main">${escHtml(pName)}</span>`,
+      address:    `<span class="surf-cell-main">${escHtml(shorten(p.address, 6, 4))}</span>`,
+      ltv:        `<span class="${ltvColor}" style="font-weight:600">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
+      collateral: `<span class="surf-cell-main">${fmtADA(p.collateral, p.collateralDecimals)}</span><span class="surf-cell-sub">${escHtml(p.collateralTicker)} · ${fmtUSD(p.collateralValueUSD)}</span>`,
+      borrow:     `<span class="surf-cell-main">${fmtADA(p.totalOwed, p.principalDecimals)}</span><span class="surf-cell-sub">${escHtml(p.principalTicker)} · ${fmtUSD(p.totalOwedUSD)}</span>`,
+      netvalue:   `<span class="surf-cell-main ${p.netValueUSD < 0 ? 'surf-txt-danger' : 'surf-txt-ok'}">${fmtUSD(p.netValueUSD)}</span>`,
+      apr:        `<span class="surf-cell-main">${fmtPct(p.interestRate)}</span>`,
+      duration:   `<span class="surf-cell-main">${fmtTime(p.elapsedYears)}</span>`,
+      interest:   `<span class="surf-cell-main">${fmtADA(p.accruedInterest, p.principalDecimals)}</span><span class="surf-cell-sub">${escHtml(p.principalTicker)}</span>`,
+      opened:     `<span class="surf-cell-main">${fmtDate(p.startTime)}</span>`,
     };
   }
 
@@ -1852,7 +1844,7 @@ function renderSurfPositions(positions, pools, summary) {
   for (const p of filtered) {
     const vals = cellVal(p);
     const rowClass = p.ltv >= 0.75 ? 'surf-row-danger' : p.ltv >= 0.5 ? 'surf-row-warning' : '';
-    html += `<tr class="${rowClass}">`;
+    html += `<tr class="${rowClass}" title="${escHtml(p.address)}">`;
     for (const col of SURF_COLUMNS) {
       html += `<td class="surf-td surf-td-${col.align}">${vals[col.key] || ''}</td>`;
     }
