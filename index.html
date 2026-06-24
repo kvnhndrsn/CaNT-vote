@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CNT Poll — Cardano Native Token Polling</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://esm.sh; connect-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://esm.sh https://cdn.jsdelivr.net; connect-src 'self'">
 <link rel="icon" href="/img/cardano-starburst.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
 </head>
@@ -28,6 +28,7 @@
     <button class="tab" data-view="portfolio">Portfolio <span class="badge badge-beta">Beta</span></button>
     <button class="tab" data-view="profile">My Profile</button>
     <button class="tab" data-view="surf">Surf Lending <span class="badge badge-beta">Beta</span></button>
+    <button class="tab" data-view="analytics">Analytics</button>
   </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
@@ -82,6 +83,56 @@
     </div>
     <div id="surfContent">
       <div class="empty-state"><p>Loading Surf positions...</p></div>
+    </div>
+  </div>
+  <div id="analyticsView" style="display:none">
+    <div class="analytics-header">
+      <div class="section-title">
+        <span>SURF Protocol Analytics</span>
+        <span class="badge badge-surf">Beta</span>
+      </div>
+      <div class="analytics-ranges">
+        <button class="btn btn-sm chart-range" data-days="1">24H</button>
+        <button class="btn btn-sm chart-range active" data-days="7">7D</button>
+        <button class="btn btn-sm chart-range" data-days="30">30D</button>
+        <button class="btn btn-sm chart-range" data-days="0">All</button>
+      </div>
+    </div>
+    <div class="analytics-grid" id="analyticsContent">
+      <div class="analytics-card" id="chartTvl">
+        <div class="analytics-card-title">TVL & Borrowed</div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+      <div class="analytics-card" id="chartHealth">
+        <div class="analytics-card-title">Position Health</div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+      <div class="analytics-card" id="chartPrices">
+        <div class="analytics-card-title">Prices</div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+      <div class="analytics-card" id="chartLtv">
+        <div class="analytics-card-title">Avg LTV & APR</div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+      <div class="analytics-card analytics-card-wide" id="chartPool">
+        <div class="analytics-card-title-row">
+          <span class="analytics-card-title">Per-Pool</span>
+          <select id="analyticsPoolSelect" class="analytics-select">
+            <option value="">All Pools</option>
+          </select>
+        </div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+      <div class="analytics-card analytics-card-wide" id="chartPoolsBreakdown">
+        <div class="analytics-card-title">Market Composition</div>
+        <div class="analytics-chart-wrap"><canvas></canvas></div>
+      </div>
+    </div>
+    <div class="analytics-empty" id="analyticsEmpty">
+      <div class="empty-state">
+        <p>No snapshot data yet. Run the snapshot endpoint to start collecting data.</p>
+      </div>
     </div>
   </div>
 </main>
@@ -196,6 +247,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script type="importmap">
 {
   "imports": {

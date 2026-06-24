@@ -29,3 +29,72 @@ CREATE TABLE IF NOT EXISTS comments (
 -- CREATE UNIQUE INDEX IF NOT EXISTS idx_delegations_unique ON delegations(delegator, COALESCE(poll_id, '00000000-0000-0000-0000-000000000000'));
 -- CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON delegations(delegator);
 -- CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON delegations(delegate);
+
+-- SURF protocol snapshots (time-series aggregate data for graphs)
+CREATE TABLE IF NOT EXISTS surf_protocol_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    snapshot_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    total_pools INT NOT NULL DEFAULT 0,
+    total_positions INT NOT NULL DEFAULT 0,
+    positions_healthy INT NOT NULL DEFAULT 0,
+    positions_at_risk INT NOT NULL DEFAULT 0,
+    positions_liquidatable INT NOT NULL DEFAULT 0,
+    total_supplied_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_borrowed_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_collateral_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_net_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_reserve_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_unpaid_interest_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    avg_ltv DOUBLE PRECISION NOT NULL DEFAULT 0,
+    avg_borrow_apr DOUBLE PRECISION NOT NULL DEFAULT 0,
+    avg_supply_apy DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_volume_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    ltv_buckets JSONB,
+    pool_breakdown JSONB,
+    surf_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+    surf_price_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    ada_price DOUBLE PRECISION NOT NULL DEFAULT 0,
+    fetch_duration_ms INT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_surf_protocol_snapshots_time ON surf_protocol_snapshots(snapshot_at);
+
+-- SURF pool snapshots (per-pool time-series data)
+CREATE TABLE IF NOT EXISTS surf_pool_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pool_id VARCHAR(100) NOT NULL,
+    snapshot_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ticker VARCHAR(20) NOT NULL DEFAULT '',
+    policy_id VARCHAR(64) NOT NULL DEFAULT '',
+    asset_name VARCHAR(128) NOT NULL DEFAULT '',
+    decimals INT NOT NULL DEFAULT 0,
+    price_ada DOUBLE PRECISION NOT NULL DEFAULT 0,
+    price_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_supplied NUMERIC(30,0) NOT NULL DEFAULT 0,
+    total_borrowed NUMERIC(30,0) NOT NULL DEFAULT 0,
+    reserve NUMERIC(30,0) NOT NULL DEFAULT 0,
+    total_supplied_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_borrowed_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    reserve_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    supply_apy DOUBLE PRECISION NOT NULL DEFAULT 0,
+    borrow_apr DOUBLE PRECISION NOT NULL DEFAULT 0,
+    utilization_rate DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_ctoken NUMERIC(30,0) NOT NULL DEFAULT 0,
+    total_unpaid_interest NUMERIC(30,0) NOT NULL DEFAULT 0,
+    total_unpaid_interest_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    max_ltv DOUBLE PRECISION NOT NULL DEFAULT 0,
+    liq_threshold_ltv DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recommended_ltv DOUBLE PRECISION NOT NULL DEFAULT 0,
+    positions_in_pool INT NOT NULL DEFAULT 0,
+    total_volume_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    historical_apy DOUBLE PRECISION NOT NULL DEFAULT 0,
+    collateral_assets JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_surf_pool_snapshots_pool_time ON surf_pool_snapshots(pool_id, snapshot_at);
+
+-- Clean up old snapshots older than 90 days (keep detailed data for graphs)
+-- Run manually or via a separate cleanup job:
+-- DELETE FROM surf_protocol_snapshots WHERE snapshot_at < NOW() - INTERVAL '90 days';
+-- DELETE FROM surf_pool_snapshots WHERE snapshot_at < NOW() - INTERVAL '90 days';
+-- DELETE FROM surf_position_snapshots WHERE snapshot_at < NOW() - INTERVAL '90 days';

@@ -758,6 +758,112 @@ select.surf-input {
   }
 }
 
+/* ---------- SURF Analytics ---------- */
+
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.analytics-ranges {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.analytics-ranges .btn {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.analytics-ranges .btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.analytics-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
+}
+
+.analytics-card-wide {
+  grid-column: 1 / -1;
+}
+
+.analytics-card-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  margin-bottom: 0.4rem;
+}
+
+.analytics-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.analytics-select {
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.analytics-select:focus {
+  border-color: var(--primary);
+}
+
+.analytics-chart-wrap {
+  position: relative;
+  height: 180px;
+}
+
+.analytics-card-wide .analytics-chart-wrap {
+  height: 200px;
+}
+
+.analytics-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.analytics-empty {
+  text-align: center;
+  padding: 2rem;
+}
+
+@media (max-width: 640px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  .analytics-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .pf-price-note {
   text-align: center; font-size: 0.62rem; color: var(--text3);
   margin-top: 0.5rem;

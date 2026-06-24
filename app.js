@@ -1297,6 +1297,9 @@ function toggleTheme() {
   localStorage.setItem('cnt_vote_theme', isDark ? 'light' : 'dark');
   $('#themeBtn').textContent = isDark ? '☀' : '☾';
   setTimeout(() => html.classList.remove('transitioning'), 850);
+  if ($('#analyticsView').style.display !== 'none' && analyticsCharts.length > 0) {
+    renderAnalytics();
+  }
 }
 
 function initTheme() {
@@ -1570,6 +1573,7 @@ $$('.tab').forEach(tab => {
     $('#portfolioView').style.display = view === 'portfolio' ? '' : 'none';
     $('#profileView').style.display = view === 'profile' ? '' : 'none';
     $('#surfView').style.display = view === 'surf' ? '' : 'none';
+    $('#analyticsView').style.display = view === 'analytics' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
         $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
@@ -1595,6 +1599,9 @@ $$('.tab').forEach(tab => {
         clearInterval(surfTickInterval);
         surfTickInterval = null;
       }
+    }
+    if (view === 'analytics') {
+      renderAnalytics();
     }
   });
 });
@@ -1873,6 +1880,226 @@ $('#surfStatusFilter')?.addEventListener('change', (e) => {
   surfFilterStatus = e.target.value;
   if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
 });
+
+/* ---------- SURF Analytics ---------- */
+
+let analyticsCharts = [];
+let analyticsDays = 7;
+
+function destroyAnalyticsCharts() {
+  for (const c of analyticsCharts) { if (c) c.destroy(); }
+  analyticsCharts = [];
+}
+
+function analyticsThemeColors() {
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  return {
+    text: d ? '#d4d4d4' : '#525252', grid: d ? '#404040' : '#e5e5e5',
+    surface: d ? '#262626' : '#f5f5f5', accent: '#d94f6f',
+    green: '#22c55e', amber: '#f59e0b', red: '#ef4444', blue: '#3b82f6',
+    purple: '#a855f7', cyan: '#06b6d4',
+  };
+}
+
+async function renderAnalytics() {
+  const container = $('#analyticsContent');
+  const empty = $('#analyticsEmpty');
+  const poolSelect = $('#analyticsPoolSelect');
+
+  try {
+    const days = analyticsDays > 0 ? analyticsDays : 3650;
+    const from = new Date(Date.now() - days * 86400000).toISOString();
+    const res = await fetch('/api/graph?type=protocol&from=' + encodeURIComponent(from));
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+
+    if (!data.snapshots || data.snapshots.length < 2) {
+      container.style.display = 'none'; empty.style.display = '';
+      return;
+    }
+
+    container.style.display = ''; empty.style.display = 'none';
+    destroyAnalyticsCharts();
+
+    const C = analyticsThemeColors();
+    const snap = data.snapshots;
+    const labels = snap.map(s => {
+      const d = new Date(s.snapshot_at);
+      return (d.getMonth() + 1) + '/' + d.getDate();
+    });
+
+    function sci(v) { return { labels, datasets: v }; }
+    function lo(c) { return { labels: { color: c, font: { size: 10 }, usePointStyle: true, pointStyle: 'circle', padding: 14 } }; }
+    function base() {
+      return {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: C.surface, titleColor: C.text, bodyColor: C.text,
+            borderColor: C.grid, borderWidth: 1, cornerRadius: 6, padding: 8,
+            bodyFont: { size: 11 },
+          },
+        },
+        interaction: { intersect: false, mode: 'index' },
+      };
+    }
+    function xAxis() { return { grid: { color: C.grid, tickLength: 4 }, ticks: { color: C.text, maxTicksLimit: 10, font: { size: 9 } } }; }
+    function yAxis(fmt) {
+      return { grid: { color: C.grid }, ticks: { color: C.text, font: { size: 9 }, callback: (v) => fmt(v) } };
+    }
+
+    const usdTick = (v) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + v.toFixed(0);
+    const pctTick = (v) => v.toFixed(1) + '%';
+    const numTick = (v) => v.toFixed(0);
+
+    function mkChart(el, config) {
+      const c = new Chart(el, config);
+      analyticsCharts.push(c);
+      return c;
+    }
+
+    // 1 — TVL & Borrowed
+    mkChart(document.querySelector('#chartTvl canvas'), {
+      type: 'line',
+      data: sci([
+        { label: 'Total Supplied', data: snap.map(s => s.total_supplied_usd), borderColor: C.accent, backgroundColor: C.accent + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Total Borrowed', data: snap.map(s => s.total_borrowed_usd), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Net Value', data: snap.map(s => s.total_net_value_usd), borderColor: C.green, borderDash: [3, 3], tension: 0.3, pointRadius: 0 },
+      ]),
+      options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+    });
+
+    // 2 — Position Health
+    mkChart(document.querySelector('#chartHealth canvas'), {
+      type: 'bar',
+      data: sci([
+        { label: 'Healthy', data: snap.map(s => s.positions_healthy), backgroundColor: C.green + '99', borderRadius: 2 },
+        { label: 'At Risk', data: snap.map(s => s.positions_at_risk), backgroundColor: C.amber + '99', borderRadius: 2 },
+        { label: 'Liquidatable', data: snap.map(s => s.positions_liquidatable), backgroundColor: C.red + '99', borderRadius: 2 },
+      ]),
+      options: {
+        ...base(),
+        scales: { x: xAxis(), y: { ...yAxis(numTick), stacked: true, beginAtZero: true } },
+        plugins: { legend: { ...lo(C.text), position: 'bottom' } },
+      },
+    });
+
+    // 3 — Prices
+    mkChart(document.querySelector('#chartPrices canvas'), {
+      type: 'line',
+      data: sci([
+        { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
+        { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
+        { label: 'SURF (USD)', data: snap.map(s => s.surf_price_usd), borderColor: C.purple, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
+      ]),
+      options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+    });
+
+    // 4 — Avg LTV & APR
+    mkChart(document.querySelector('#chartLtv canvas'), {
+      type: 'line',
+      data: sci([
+        { label: 'Avg LTV', data: snap.map(s => (s.avg_ltv || 0) * 100), borderColor: C.red, tension: 0.3, pointRadius: 0 },
+        { label: 'Avg Borrow APR', data: snap.map(s => (s.avg_borrow_apr || 0) * 100), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
+        { label: 'Avg Supply APY', data: snap.map(s => (s.avg_supply_apy || 0) * 100), borderColor: C.green, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
+      ]),
+      options: { ...base(), scales: { x: xAxis(), y: yAxis(pctTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+    });
+
+    // 5 — Per-Pool
+    const poolIds = data.availablePools || [];
+    const prevVal = poolSelect.value;
+    poolSelect.innerHTML = '<option value="">All Pools</option>' + poolIds.map(id => '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>').join('');
+    poolSelect.value = prevVal || '';
+
+    let poolSnaps = null;
+    if (prevVal) {
+      try {
+        const pr = await fetch('/api/graph?type=pools&pool_id=' + encodeURIComponent(prevVal) + '&from=' + encodeURIComponent(from));
+        poolSnaps = await pr.json();
+        if (!Array.isArray(poolSnaps)) poolSnaps = null;
+      } catch { poolSnaps = null; }
+    }
+
+    const ctx5 = document.querySelector('#chartPool canvas');
+    if (poolSnaps && poolSnaps.length > 2) {
+      const pl = poolSnaps.map(s => { const d = new Date(s.snapshot_at); return (d.getMonth() + 1) + '/' + d.getDate(); });
+      mkChart(ctx5, {
+        type: 'line',
+        data: {
+          labels: pl,
+          datasets: [
+            { label: 'Supplied', data: poolSnaps.map(s => s.total_supplied_usd), borderColor: C.accent, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+            { label: 'Borrowed', data: poolSnaps.map(s => s.total_borrowed_usd), borderColor: C.amber, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+            { label: 'APR', data: poolSnaps.map(s => (s.borrow_apr || 0) * 100), borderColor: C.red, tension: 0.3, pointRadius: 0, yAxisID: 'y1' },
+          ],
+        },
+        options: {
+          ...base(),
+          scales: {
+            x: xAxis(),
+            y: { ...yAxis(usdTick), position: 'left', beginAtZero: true },
+            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: C.text, font: { size: 9 }, callback: pctTick } },
+          },
+          plugins: { legend: { ...lo(C.text), position: 'bottom' } },
+        },
+      });
+    } else {
+      mkChart(ctx5, {
+        type: 'bar', data: { labels: ['Select a pool'], datasets: [{ label: '', data: [0], backgroundColor: 'transparent' }] },
+        options: { ...base(), plugins: { legend: { display: false } } },
+      });
+    }
+
+    // 6 — Market Composition
+    const last = snap[snap.length - 1];
+    const bd = last.pool_breakdown || {};
+    const names = Object.keys(bd);
+    const poolColors = [C.accent, C.blue, C.green, C.amber, C.purple, C.cyan, C.red];
+    mkChart(document.querySelector('#chartPoolsBreakdown canvas'), {
+      type: 'doughnut',
+      data: {
+        labels: names.map(id => bd[id]?.ticker || id),
+        datasets: [{
+          data: names.map(id => bd[id]?.supplied_usd || 0),
+          backgroundColor: names.map((_, i) => poolColors[i % poolColors.length]),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'right', labels: { color: C.text, font: { size: 11 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: {
+            backgroundColor: C.surface, titleColor: C.text, bodyColor: C.text,
+            borderColor: C.grid, borderWidth: 1, cornerRadius: 6, padding: 8,
+            callbacks: {
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                return ' ' + ctx.label + ': $' + (ctx.parsed / 1e6).toFixed(2) + 'M (' + ((ctx.parsed / total) * 100).toFixed(1) + '%)';
+              },
+            },
+          },
+        },
+      },
+    });
+  } catch (e) {
+    container.style.display = 'none'; empty.style.display = '';
+    empty.querySelector('p').textContent = 'Error: ' + e.message;
+  }
+}
+
+$$('.chart-range').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.chart-range').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    analyticsDays = parseInt(btn.dataset.days);
+    renderAnalytics();
+  });
+});
+
+$('#analyticsPoolSelect')?.addEventListener('change', renderAnalytics);
 
 /* ---------- Epoch ---------- */
 
