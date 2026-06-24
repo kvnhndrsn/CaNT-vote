@@ -922,6 +922,270 @@ select.surf-input {
   padding: 0.5rem 0;
 }
 
+/* ---------- Poll Toolbar ---------- */
+
+.poll-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.poll-search-input {
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  flex: 1;
+  min-width: 140px;
+}
+
+.poll-search-input:focus {
+  border-color: var(--primary);
+}
+
+.poll-select {
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.poll-select:focus {
+  border-color: var(--primary);
+}
+
+/* Category badges */
+.poll-category {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  background: var(--primary-dim);
+  color: var(--primary);
+  letter-spacing: 0.02em;
+}
+
+/* Poll option colors */
+.poll-option-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* Vote type badge */
+.vote-type-badge {
+  font-size: 0.65rem;
+  color: var(--text3);
+  margin-bottom: 0.4rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--surface2);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Vote splitting inputs */
+.vote-split-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.vote-split-row label {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.vote-split-input {
+  width: 70px;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.78rem;
+  text-align: right;
+  font-family: inherit;
+  outline: none;
+}
+
+.vote-split-input:focus {
+  border-color: var(--primary);
+}
+
+.vote-split-pct {
+  font-size: 0.72rem;
+  color: var(--text3);
+  width: 2rem;
+  text-align: right;
+}
+
+.vote-split-total {
+  font-size: 0.72rem;
+  color: var(--text3);
+  text-align: right;
+  margin-top: 0.2rem;
+}
+
+/* Comments */
+.comments-summary {
+  font-size: 0.7rem;
+  color: var(--text3);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.comments-summary:hover {
+  color: var(--primary);
+}
+
+.comment-item {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-meta {
+  font-size: 0.65rem;
+  color: var(--text3);
+  margin-bottom: 0.1rem;
+}
+
+.comment-body {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* Profile View */
+.profile-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.profile-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.profile-stat {
+  text-align: center;
+}
+
+.profile-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-stat-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+}
+
+.profile-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+  margin: 0.75rem 0 0.35rem;
+}
+
+.profile-vote-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.profile-vote-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-vote-choice {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--primary-dim);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.profile-vote-weight {
+  font-size: 0.7rem;
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+.profile-empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text3);
+  font-size: 0.82rem;
+}
+
+/* Form row */
+.form-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   .container { padding: 1rem; }
   header { padding: 0 1rem; }
@@ -932,4 +1196,9 @@ select.surf-input {
   .mini-cards-inner { grid-template-columns: 1fr; }
   .epoch-card { flex-wrap: wrap; gap: 0.35rem; padding: 0.45rem 0.65rem; }
   .epoch-countdown { width: 100%; text-align: center; }
+  .poll-toolbar { flex-direction: column; }
+  .poll-search-input { min-width: 0; }
+  .form-row { flex-direction: column; }
+  .profile-header { flex-direction: column; text-align: center; }
+  .profile-stats { justify-content: center; }
 }

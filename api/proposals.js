@@ -86,6 +86,10 @@ export default async function handler(req, res) {
         return res.json({
           ...proposal,
           target_fingerprint: proposal.target_fingerprint || null,
+          options: proposal.options || ['Yes', 'No', 'Abstain'],
+          category: proposal.category || 'General',
+          voting_type: proposal.voting_type || 'standard',
+          allow_split: proposal.allow_split || false,
           voterCount: votes.length,
           totalWeight: totalWeight.toString(),
           tally: formattedTally,
@@ -163,6 +167,10 @@ export default async function handler(req, res) {
         p.totalSupply = isADA ? '45000000000000000' : (ai.supply || null);
         p.tokenName = ai.name || null;
         p.tokenImage = ai.image || null;
+        p.options = p.options || ['Yes', 'No', 'Abstain'];
+        p.category = p.category || 'General';
+        p.voting_type = p.voting_type || 'standard';
+        p.allow_split = p.allow_split || false;
       });
 
       return res.json(active);
@@ -212,6 +220,28 @@ export default async function handler(req, res) {
         if (info && info.fingerprint) fingerprint = info.fingerprint;
       }
 
+      const options = req.body.options || ['Yes', 'No', 'Abstain'];
+      const category = req.body.category || 'General';
+      const votingType = req.body.votingType || 'standard';
+      const allowSplit = !!req.body.allowSplit;
+
+      if (!Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ error: 'At least 2 options required' });
+      }
+      if (options.length > 8) {
+        return res.status(400).json({ error: 'Maximum 8 options allowed' });
+      }
+      for (const opt of options) {
+        if (!opt || opt.length > 100) {
+          return res.status(400).json({ error: 'Each option must be 1-100 characters' });
+        }
+      }
+
+      let snapshotBlock = null;
+      if (req.body.snapshotBlock) {
+        snapshotBlock = BigInt(req.body.snapshotBlock);
+      }
+
       const { data, error } = await supabase
         .from('proposals')
         .insert({
@@ -221,6 +251,11 @@ export default async function handler(req, res) {
           target_asset_name: targetAssetName || '',
           target_fingerprint: fingerprint,
           creator_address: creatorAddress,
+          options,
+          category,
+          voting_type: votingType,
+          allow_split: allowSplit,
+          snapshot_block: snapshotBlock,
         })
         .select()
         .single();

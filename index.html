@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CNT Vote — Cardano Native Token Voting</title>
+<title>CNT Poll — Cardano Native Token Polling</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://esm.sh; connect-src 'self'">
 <link rel="icon" href="/img/cardano-starburst.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/styles.css">
@@ -11,10 +11,10 @@
 <body>
 
 <header>
-  <div class="logo"><span>CNT</span> Vote</div>
+  <div class="logo"><span>CNT</span> Poll</div>
   <nav>
     <button class="btn btn-sm btn-ghost" id="themeBtn">☀</button>
-    <button class="btn btn-sm" id="createBtn" style="display:none">+ Propose</button>
+    <button class="btn btn-sm" id="createBtn" style="display:none">+ New Poll</button>
     <div id="walletArea">
       <button class="btn btn-sm btn-primary" id="connectBtn">Connect Wallet</button>
     </div>
@@ -24,22 +24,40 @@
 <main class="container">
   <div id="epochBar"></div>
   <div class="tabs">
-    <button class="tab tab-active" data-view="proposals">Proposals</button>
+    <button class="tab tab-active" data-view="polls">Polls</button>
     <button class="tab" data-view="portfolio">Portfolio <span class="badge badge-beta">Beta</span></button>
+    <button class="tab" data-view="profile">My Profile</button>
     <button class="tab" data-view="surf">Surf Lending <span class="badge badge-beta">Beta</span></button>
   </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
-    <div class="section-title">
-      Active Proposals
-      <span class="badge" id="proposalCount">0</span>
+    <div class="poll-toolbar">
+      <input type="text" id="pollSearch" placeholder="Search polls..." class="poll-search-input">
+      <select id="pollCategoryFilter" class="poll-select">
+        <option value="">All Categories</option>
+        <option value="General">General</option>
+        <option value="DeFi">DeFi</option>
+        <option value="NFT">NFT</option>
+        <option value="Governance">Governance</option>
+        <option value="Meme">Meme</option>
+        <option value="Community">Community</option>
+        <option value="Proposal">Proposal</option>
+      </select>
+      <div id="tokenFilter"></div>
     </div>
-    <div id="tokenFilter"></div>
+    <div class="section-title">
+      Active Polls
+      <span class="badge" id="pollCount">0</span>
+    </div>
     <div id="proposalList"></div>
   </div>
   <div id="portfolioView" style="display:none">
     <div class="section-title">Portfolio</div>
     <div id="portfolioContent"></div>
+  </div>
+  <div id="profileView" style="display:none">
+    <div class="section-title">My Profile</div>
+    <div id="profileContent"></div>
   </div>
   <div id="surfView" style="display:none">
     <div class="surf-header">
@@ -92,14 +110,39 @@
 <div class="modal-overlay" id="createModal">
   <div class="modal">
     <button class="btn btn-sm btn-ghost modal-close" data-close="createModal">&times;</button>
-    <h2>Create Proposal</h2>
+    <h2>Create Poll</h2>
     <div class="form-group">
       <label>Title</label>
-      <input type="text" id="propTitle" placeholder="e.g. Fund the Catalyst proposal">
+      <input type="text" id="propTitle" placeholder="e.g. Should we fund the Catalyst proposal?">
     </div>
     <div class="form-group">
       <label>Description</label>
-      <textarea id="propDesc" placeholder="Describe your proposal..."></textarea>
+      <textarea id="propDesc" placeholder="Describe your poll..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Options <span class="tooltip">(comma-separated, 2-8 options)</span></label>
+      <input type="text" id="propOptions" placeholder="Yes, No, Abstain" value="Yes, No, Abstain">
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Category</label>
+        <select id="propCategory">
+          <option value="General">General</option>
+          <option value="DeFi">DeFi</option>
+          <option value="NFT">NFT</option>
+          <option value="Governance">Governance</option>
+          <option value="Meme">Meme</option>
+          <option value="Community">Community</option>
+          <option value="Proposal">Proposal</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Vote Type</label>
+        <select id="propVotingType">
+          <option value="standard">Standard (1 token = 1 vote)</option>
+          <option value="quadratic">Quadratic (√balance)</option>
+        </select>
+      </div>
     </div>
     <div class="form-group">
       <label>Token <span class="tooltip">(select a curated token or choose Custom)</span></label>
@@ -116,7 +159,7 @@
       <label>Asset Name (hex)</label>
       <input type="text" id="propAsset" placeholder="Leave empty for default policy token">
     </div>
-    <button class="btn btn-primary" id="createSubmitBtn" style="width:100%">Create Proposal</button>
+    <button class="btn btn-primary" id="createSubmitBtn" style="width:100%">Create Poll</button>
   </div>
 </div>
 
@@ -126,6 +169,7 @@
     <h2 id="voteModalTitle">Cast Your Vote</h2>
     <p class="tooltip" id="voteTokenInfo" style="margin-bottom:0.75rem"></p>
     <div class="token-selector" id="voteTokenSelector"></div>
+    <div id="voteTypeBadge" class="vote-type-badge"></div>
     <div class="vote-options" id="voteOptions"></div>
     <button class="btn btn-primary" id="voteSubmitBtn" style="width:100%">Sign & Submit Vote</button>
   </div>
@@ -136,11 +180,24 @@
     <button class="btn btn-sm btn-ghost modal-close" data-close="auditModal">&times;</button>
     <h2>Audit Trail</h2>
     <p class="tooltip" id="auditInfo" style="margin-bottom:0.75rem"></p>
+    <div id="auditTally" style="margin-bottom:0.5rem"></div>
     <div class="table-wrap" id="auditTableWrap"></div>
     <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
       <button class="btn btn-sm" id="copyAuditBtn">Copy JSON</button>
       <a class="btn btn-sm" id="downloadAuditBtn" target="_blank">Download</a>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="commentsModal">
+  <div class="modal" style="max-width:500px">
+    <button class="btn btn-sm btn-ghost modal-close" data-close="commentsModal">&times;</button>
+    <h2 id="commentsModalTitle">Comments</h2>
+    <div id="commentsList" style="margin-bottom:0.75rem;max-height:300px;overflow-y:auto"></div>
+    <div class="form-group" style="margin-bottom:0">
+      <textarea id="commentInput" placeholder="Add a comment..." style="min-height:50px"></textarea>
+    </div>
+    <button class="btn btn-primary btn-sm" id="commentSubmitBtn" style="margin-top:0.35rem">Post Comment</button>
   </div>
 </div>
 

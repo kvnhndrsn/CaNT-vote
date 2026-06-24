@@ -43,6 +43,11 @@ const CURATED_TOKENS = [
   { label: 'SUNDAE',policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', fingerprint: 'asset1m4u92ke6820pkk07m8qmmguye02ewr8g6tezr0', logo: TOKEN_LOGOS.SUNDAE },
 ];
 
+const POLL_COLORS = [
+  '#22c55e', '#ef4444', '#3b82f6', '#f59e0b',
+  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+];
+
 const state = {
   wallet: null,
   api: null,
@@ -53,6 +58,9 @@ const state = {
   proposals: [],
   currentProposal: null,
   filterToken: '',
+  pollSearch: '',
+  pollCategory: '',
+  commentPollId: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -88,7 +96,7 @@ function pctNum(part, total) {
   return Number(BigInt(part)) / Number(BigInt(total)) * 100;
 }
 
-/* ---------- Proposals ---------- */
+/* ---------- Polls ---------- */
 
 async function fetchProposals() {
   try {
@@ -104,7 +112,7 @@ async function fetchProposals() {
   } catch (e) {
     console.error(e);
     $('#proposalList').innerHTML =
-      '<div class="empty-state"><strong>Could not load proposals</strong><p>' + escHtml(e.message) + '</p></div>';
+      '<div class="empty-state"><strong>Could not load polls</strong><p>' + escHtml(e.message) + '</p></div>';
   }
 }
 
@@ -119,13 +127,16 @@ function renderMiniCards() {
   function miniTally(p) {
     const summary = p.voteSummary || {};
     const total = BigInt(p.totalVoteWeight || '0');
+    const opts = p.options || ['Yes', 'No', 'Abstain'];
     if (total <= 0n) return '';
-    const yesPct = pctNum(summary.Yes || '0', total.toString());
-    const noPct = pctNum(summary.No || '0', total.toString());
-    const absPct = pctNum(summary.Abstain || '0', total.toString());
-    return `
-      <div class="mini-tally-bar"><div class="mini-tally-seg mini-tally-yes" style="flex:${yesPct}"></div><div class="mini-tally-seg mini-tally-no" style="flex:${noPct}"></div><div class="mini-tally-seg mini-tally-abs" style="flex:${absPct}"></div></div>
-      <div class="mini-tally-pcts"><span class="mini-tally-yes-t">${pctStr(summary.Yes || '0', total.toString())}</span><span class="mini-tally-no-t">${pctStr(summary.No || '0', total.toString())}</span></div>`;
+    const segs = opts.map((opt, i) => {
+      const pct = pctNum(summary[opt] || '0', total.toString());
+      return `<div class="mini-tally-seg" style="flex:${pct};background:${getOptionColor(i)}"></div>`;
+    }).join('');
+    const pcts = opts.slice(0, 2).map((opt, i) => {
+      return `<span style="color:${getOptionColor(i)}">${pctStr(summary[opt] || '0', total.toString())}</span>`;
+    }).join('');
+    return `<div class="mini-tally-bar">${segs}</div><div class="mini-tally-pcts">${pcts}</div>`;
   }
 
   const withVotes = proposals.filter(p => p.totalVoteWeight && BigInt(p.totalVoteWeight) > 0n);
@@ -134,9 +145,9 @@ function renderMiniCards() {
   let mostVotesCard = '';
   if (withVotes.length > 0) {
     const best = withVotes.reduce((a, b) => BigInt(a.totalVoteWeight) > BigInt(b.totalVoteWeight) ? a : b);
-    mostVotesCard = `
+      mostVotesCard = `
       <div class="mini-card">
-        <span class="mini-label">Most Votes</span>
+        <span class="mini-label">Most Voted</span>
         <span class="mini-value">${formatWeight(best.totalVoteWeight)}</span>
         ${miniTally(best)}
         <span class="mini-sub">${escHtml(best.title)}</span>
@@ -196,17 +207,14 @@ function renderFilter() {
   const container = $('#tokenFilter');
   if (list.length === 0) { container.innerHTML = ''; return; }
   container.innerHTML = `
-    <div class="filter-row">
-      <label>Token:</label>
-      <select id="tokenSelect">
-        <option value="">All Tokens (${state.proposals.length})</option>
-        ${list.map(t => `
-          <option value="${escHtml(t.id)}" ${state.filterToken === t.id ? 'selected' : ''}>
-            ${escHtml(t.label)}
-          </option>
-        `).join('')}
-      </select>
-    </div>
+    <select id="tokenSelect" class="poll-select">
+      <option value="">All Tokens</option>
+      ${list.map(t => `
+        <option value="${escHtml(t.id)}" ${state.filterToken === t.id ? 'selected' : ''}>
+          ${escHtml(t.label)}
+        </option>
+      `).join('')}
+    </select>
   `;
   $('#tokenSelect').addEventListener('change', (e) => {
     state.filterToken = e.target.value;
@@ -214,15 +222,14 @@ function renderFilter() {
   });
 }
 
-function pieSvg(summary, total) {
+function pieSvg(summary, total, options) {
   if (!total || total === '0') return '';
   const t = Number(total);
-  const colors = ['#22c55e', '#ef4444', '#a1a1aa'];
+  const opts = options || ['Yes', 'No', 'Abstain'];
   const r = 10, cx = 12, cy = 12;
-  const allChoices = ['Yes', 'No', 'Abstain'];
   let accum = 0;
   let paths = '';
-  allChoices.forEach((choice, i) => {
+  opts.forEach((choice, i) => {
     const weight = summary[choice];
     const pct = weight ? Number(weight) / t : 0;
     if (pct === 0) return;
@@ -234,30 +241,53 @@ function pieSvg(summary, total) {
     const x2 = cx + r * Math.sin(a2 * Math.PI / 180);
     const y2 = cy - r * Math.cos(a2 * Math.PI / 180);
     const large = pct > 0.5 ? 1 : 0;
-    paths += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${colors[i]}"/>`;
+    paths += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${getOptionColor(i)}"/>`;
   });
   if (accum < 1) paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="2 2"/>`;
   return `<svg width="40" height="40" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--surface2)"/>${paths}</svg>`;
 }
 
+function getOptionColor(index) {
+  return POLL_COLORS[index % POLL_COLORS.length];
+}
+
 function renderProposals() {
   const list = $('#proposalList');
-  const count = $('#proposalCount');
-  const filtered = state.filterToken
-    ? state.proposals.filter(p => {
-        if (state.filterToken === 'ADA') return !p.target_policy_id;
-        return (p.target_fingerprint && p.target_fingerprint === state.filterToken) || p.target_policy_id === state.filterToken;
-      })
-    : state.proposals;
+  const count = $('#pollCount');
+
+  // Apply all filters
+  let filtered = state.proposals;
+
+  if (state.filterToken) {
+    filtered = filtered.filter(p => {
+      if (state.filterToken === 'ADA') return !p.target_policy_id;
+      return (p.target_fingerprint && p.target_fingerprint === state.filterToken) || p.target_policy_id === state.filterToken;
+    });
+  }
+
+  if (state.pollCategory) {
+    filtered = filtered.filter(p => (p.category || 'General') === state.pollCategory);
+  }
+
+  if (state.pollSearch) {
+    const q = state.pollSearch.toLowerCase();
+    filtered = filtered.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      (p.description || '').toLowerCase().includes(q)
+    );
+  }
+
   count.textContent = filtered.length;
 
   if (filtered.length === 0) {
     list.innerHTML =
-      '<div class="empty-state"><strong>No proposals</strong><p>' +
-      (state.filterToken ? 'No proposals for this token yet.' : 'Be the first to create one!') +
+      '<div class="empty-state"><strong>No polls found</strong><p>' +
+      (state.filterToken || state.pollCategory || state.pollSearch ? 'Try different filters.' : 'Be the first to create one!') +
       '</p></div>';
     return;
   }
+
+  const fmtPct = (v) => (v * 100).toFixed(1) + '%';
 
   list.innerHTML = filtered.map(p => {
     const isADA = !p.target_policy_id;
@@ -269,8 +299,10 @@ function renderProposals() {
 
     const summary = p.voteSummary || {};
     const total = BigInt(p.totalVoteWeight || '0');
-    const choices = Object.entries(summary);
     const isCreator = state.address && p.creator_address === state.address;
+    const pollOptions = p.options || ['Yes', 'No', 'Abstain'];
+    const category = p.category || 'General';
+    const votingType = p.voting_type || 'standard';
 
     function supplyPct(totalStr, supplyStr) {
       const t = Number(totalStr), s = Number(supplyStr);
@@ -282,7 +314,7 @@ function renderProposals() {
     }
 
     let tallyHtml = '';
-    if (choices.length > 0) {
+    if (total > 0n) {
       const totalS = p.totalSupply ? BigInt(p.totalSupply) : null;
       const circS = p.circulatingSupply ? BigInt(p.circulatingSupply) : null;
       const totalPct = totalS ? supplyPct(total.toString(), totalS.toString()) : null;
@@ -293,27 +325,23 @@ function renderProposals() {
       if (circPct) pctParts.push(circPct + ' of circ');
       const pctStr2 = pctParts.length > 0 ? ' · ' + pctParts.join(' · ') : '';
 
-      const barColors = { Yes: '#22c55e', No: '#ef4444', Abstain: '#52525b' };
-      const yesPct = pctNum(summary.Yes || '0', total.toString());
-      const noPct = pctNum(summary.No || '0', total.toString());
-      const absPct = pctNum(summary.Abstain || '0', total.toString());
-      const bar = `
-        <div class="tally-bar">
-          <div class="tally-bar-seg" style="flex:${yesPct};background:#22c55e" title="Yes ${yesPct.toFixed(1)}%"></div>
-          <div class="tally-bar-seg" style="flex:${noPct};background:#ef4444" title="No ${noPct.toFixed(1)}%"></div>
-          <div class="tally-bar-seg" style="flex:${absPct};background:#52525b" title="Abstain ${absPct.toFixed(1)}%"></div>
-        </div>`;
+      const segs = pollOptions.map((opt, i) => {
+        const w = summary[opt] || '0';
+        const pct = pctNum(w, total.toString());
+        return `<div class="tally-bar-seg" style="flex:${pct};background:${getOptionColor(i)}" title="${escHtml(opt)} ${pct.toFixed(1)}%"></div>`;
+      }).join('');
 
-      const lines = [];
-      for (const c of ['Yes', 'No', 'Abstain']) {
-        const w = summary[c] || '0';
-        lines.push(`<span class="tally-line"><span class="tally-dot" style="background:${barColors[c]}"></span><strong>${pctStr(w, total.toString())}</strong> ${escHtml(c)} <span class="tally-w">${formatWeight(w)}</span></span>`);
-      }
+      const bar = `<div class="tally-bar">${segs}</div>`;
+
+      const lines = pollOptions.map((opt, i) => {
+        const w = summary[opt] || '0';
+        return `<span class="tally-line"><span class="tally-dot" style="background:${getOptionColor(i)}"></span><strong>${pctStr(w, total.toString())}</strong> ${escHtml(opt)} <span class="tally-w">${formatWeight(w)}</span></span>`;
+      }).join('');
 
       tallyHtml = `
         <div class="card-tally">
           ${bar}
-          <div class="tally-lines">${lines.join('')}</div>
+          <div class="tally-lines">${lines}</div>
           <div class="tally-total">${formatWeight(total.toString())} ${escHtml(unit)}${pctStr2}</div>
         </div>
       `;
@@ -329,6 +357,8 @@ function renderProposals() {
       ? `<button class="btn btn-danger delete-btn" data-id="${p.id}">Delete</button>`
       : '';
 
+    const vtLabel = votingType === 'quadratic' ? ' ✓' : '';
+
     return `
       <div class="proposal-card" data-id="${p.id}">
         <div class="card-header">
@@ -337,12 +367,13 @@ function renderProposals() {
             <div class="card-title-row">
               <h3>${escHtml(p.title)}</h3>
               <div class="card-actions">
-                <button class="btn btn-primary vote-btn">Vote</button>
+                <button class="btn btn-primary vote-btn">Vote${vtLabel}</button>
                 <button class="btn audit-btn">Audit</button>
                 ${deleteBtn}
               </div>
             </div>
             <div class="meta">
+              <span class="poll-category">${escHtml(category)}</span>
               <span>${escHtml(assetLabel)}</span>
               <span class="expiry" data-expires="${p.expiresAt}">--</span>
               <span>by ${escHtml(shorten(p.creator_address, 6))}</span>
@@ -351,10 +382,13 @@ function renderProposals() {
             <div class="extra" style="display:none">
               <div class="meta" style="margin-top:0.3rem">
                 <span>Created ${new Date(p.created_at).toLocaleString()}</span>
-                <span>${escHtml(shorten(p.creator_address, 20))}</span>
+                <span style="font-size:0.65rem">Vote type: ${votingType}${p.allow_split ? ' · split allowed' : ''}</span>
               </div>
             </div>
             ${tallyHtml}
+            <div class="meta" style="margin-top:0.25rem">
+              <span class="comments-summary" data-poll-id="${p.id}">💬 comments</span>
+            </div>
           </div>
         </div>
       </div>
@@ -363,10 +397,17 @@ function renderProposals() {
 
   list.querySelectorAll('.proposal-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.card-actions') || e.target.closest('button')) return;
+      if (e.target.closest('.card-actions') || e.target.closest('button') || e.target.closest('.comments-summary')) return;
       card.classList.toggle('expanded');
       const extra = card.querySelector('.extra');
       if (extra) extra.style.display = card.classList.contains('expanded') ? '' : 'none';
+    });
+  });
+
+  list.querySelectorAll('.comments-summary').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCommentsModal(el.dataset.pollId);
     });
   });
 
@@ -387,7 +428,7 @@ function renderProposals() {
   list.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = e.target.dataset.id;
-      if (!confirm('Delete this proposal?')) return;
+      if (!confirm('Delete this poll?')) return;
       try {
         const res = await fetch('/api/proposals', {
           method: 'DELETE',
@@ -395,7 +436,7 @@ function renderProposals() {
           body: JSON.stringify({ id, creatorAddress: state.address }),
         });
         if (!res.ok) throw new Error((await res.json()).error);
-        toast('Proposal deleted', 'success');
+        toast('Poll deleted', 'success');
         fetchProposals();
       } catch (ex) {
         toast('Delete failed: ' + ex.message, 'error');
@@ -600,7 +641,7 @@ async function openVoteModal(proposalId) {
 
   try {
     const res = await fetch(`/api/proposals?id=${proposalId}&voter=${encodeURIComponent(state.address)}`);
-    if (!res.ok) throw new Error('Proposal not found');
+    if (!res.ok) throw new Error('Poll not found');
     const proposal = await res.json();
     state.currentProposal = proposal;
 
@@ -633,11 +674,19 @@ async function openVoteModal(proposalId) {
       <span>${escHtml(tokenLabel)}${supplyInfo.length > 0 ? ' &middot; ' + supplyInfo.join(' &middot; ') : ''}</span>
     `;
 
-    const optionsDiv = $('#voteOptions');
+    const pollOptions = proposal.options || ['Yes', 'No', 'Abstain'];
+    const votingType = proposal.voting_type || 'standard';
+    const allowSplit = proposal.allow_split || false;
     const tally = proposal.tally || {};
     const tallyTotal = BigInt(proposal.totalWeight || 0);
 
-    const myChoice = proposal.myVote?.vote_choice;
+    // Show voting type badge
+    const typeLabels = { standard: 'Standard (1 token = 1 vote)', quadratic: 'Quadratic (√balance)' };
+    $('#voteTypeBadge').textContent = typeLabels[votingType] || '';
+
+    const myVote = proposal.myVote;
+    const myChoice = myVote?.vote_choice;
+    const mySplitWeights = myVote?.split_weights ? (typeof myVote.split_weights === 'string' ? JSON.parse(myVote.split_weights) : myVote.split_weights) : null;
 
     function choiceSupplyPct(w, s) {
       if (!s || s <= 0n) return '';
@@ -647,35 +696,96 @@ async function openVoteModal(proposalId) {
       return pct.toFixed(6) + '%';
     }
 
-    optionsDiv.innerHTML = ['Yes', 'No', 'Abstain'].map(c => {
-      const isMyVote = c === myChoice;
-      const weight = tally[c];
-      const w = weight ? BigInt(weight) : null;
-      const pct = w && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
-      const totalPctStr = w && totalS ? choiceSupplyPct(weight, totalS) : null;
-      const circPctStr = w && circS && circS !== totalS ? choiceSupplyPct(weight, circS) : null;
-      const supplyParts = [];
-      if (totalPctStr) supplyParts.push(totalPctStr + ' of total');
-      if (circPctStr) supplyParts.push(circPctStr + ' of circ');
-      const supplyStr = supplyParts.length > 0 ? ' (' + supplyParts.join(' · ') + ')' : '';
-      const label = weight
-        ? `${escHtml(c)}: ${formatWeight(weight)} ${escHtml(unitLabel)} (${pct.toFixed(1)}%)${supplyStr}`
-        : escHtml(c);
-      return `
-        <label class="vote-option${isMyVote ? ' selected' : ''}" data-choice="${escHtml(c)}">
-          <input type="radio" name="voteChoice" value="${escHtml(c)}"${isMyVote ? ' checked' : ''}>
-          <span>${label}${isMyVote ? ' <span class="my-vote-badge">your vote</span>' : ''}</span>
-        </label>
-      `;
-    }).join('');
+    const optionsDiv = $('#voteOptions');
 
-    optionsDiv.querySelectorAll('.vote-option').forEach(el => {
-      el.addEventListener('click', () => {
-        optionsDiv.querySelectorAll('.vote-option').forEach(o => o.classList.remove('selected'));
-        el.classList.add('selected');
-        el.querySelector('input').checked = true;
+    if (allowSplit) {
+      // Vote splitting UI
+      const splitDefault = {};
+      for (const opt of pollOptions) {
+        splitDefault[opt] = mySplitWeights?.[opt] != null ? mySplitWeights[opt] : (myChoice === opt ? 100 : 0);
+      }
+      // Ensure at least one option has weight
+      let hasAny = Object.values(splitDefault).some(v => v > 0);
+      if (!hasAny) splitDefault[pollOptions[0]] = 100;
+
+      function renderSplitUI(split) {
+        const totalPct = Object.values(split).reduce((s, v) => s + Number(v), 0);
+        const isComplete = Math.abs(totalPct - 100) < 0.01;
+        return pollOptions.map((opt, i) => {
+          const val = split[opt] || 0;
+          return `
+            <div class="vote-split-row">
+              <span class="poll-option-dot" style="background:${getOptionColor(i)}"></span>
+              <label>${escHtml(opt)}</label>
+              <input type="number" class="vote-split-input" data-opt="${escHtml(opt)}" value="${val}" min="0" max="100" step="1">
+              <span class="vote-split-pct">%</span>
+            </div>
+          `;
+        }).join('') + `<div class="vote-split-total" style="color:${isComplete ? 'var(--success)' : 'var(--danger)'}">Total: ${totalPct.toFixed(0)}%${!isComplete ? ' (must sum to 100%)' : ''}</div>`;
+      }
+
+      let currentSplit = { ...splitDefault };
+      optionsDiv.innerHTML = renderSplitUI(currentSplit);
+
+      optionsDiv.querySelectorAll('.vote-split-input').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const opt = inp.dataset.opt;
+          currentSplit[opt] = Math.max(0, Math.min(100, parseInt(inp.value) || 0));
+          const totalPct = Object.values(currentSplit).reduce((s, v) => s + Number(v), 0);
+          if (totalPct > 100) {
+            currentSplit[opt] = Math.max(0, Number(currentSplit[opt]) - (totalPct - 100));
+            inp.value = currentSplit[opt];
+          }
+          // Update total display
+          const totalEl = optionsDiv.querySelector('.vote-split-total');
+          const newTotal = Object.values(currentSplit).reduce((s, v) => s + Number(v), 0);
+          const isComplete = Math.abs(newTotal - 100) < 0.01;
+          totalEl.textContent = `Total: ${newTotal.toFixed(0)}%${!isComplete ? ' (must sum to 100%)' : ''}`;
+          totalEl.style.color = isComplete ? 'var(--success)' : 'var(--danger)';
+        });
       });
-    });
+
+      // Store for submit
+      optionsDiv._getSplitWeights = () => {
+        const result = {};
+        optionsDiv.querySelectorAll('.vote-split-input').forEach(inp => {
+          result[inp.dataset.opt] = Math.max(0, Math.min(100, parseInt(inp.value) || 0));
+        });
+        return result;
+      };
+    } else {
+      // Standard single-choice UI
+      optionsDiv.innerHTML = pollOptions.map((opt, i) => {
+        const isMyVote = opt === myChoice;
+        const weight = tally[opt];
+        const w = weight ? BigInt(weight) : null;
+        const pct = w && tallyTotal > 0n ? pctNum(weight, proposal.totalWeight) : 0;
+        const totalPctStr = w && totalS ? choiceSupplyPct(weight, totalS) : null;
+        const circPctStr = w && circS && circS !== totalS ? choiceSupplyPct(weight, circS) : null;
+        const supplyParts = [];
+        if (totalPctStr) supplyParts.push(totalPctStr + ' of total');
+        if (circPctStr) supplyParts.push(circPctStr + ' of circ');
+        const supplyStr = supplyParts.length > 0 ? ' (' + supplyParts.join(' · ') + ')' : '';
+        const label = weight
+          ? `<span class="poll-option-dot" style="background:${getOptionColor(i)};display:inline-block;vertical-align:middle"></span> ${escHtml(opt)}: ${formatWeight(weight)} ${escHtml(unitLabel)} (${pct.toFixed(1)}%)${supplyStr}`
+          : `<span class="poll-option-dot" style="background:${getOptionColor(i)};display:inline-block;vertical-align:middle"></span> ${escHtml(opt)}`;
+        return `
+          <label class="vote-option${isMyVote ? ' selected' : ''}" data-choice="${escHtml(opt)}">
+            <input type="radio" name="voteChoice" value="${escHtml(opt)}"${isMyVote ? ' checked' : ''}>
+            <span>${label}${isMyVote ? ' <span class="my-vote-badge">your vote</span>' : ''}</span>
+          </label>
+        `;
+      }).join('');
+
+      optionsDiv.querySelectorAll('.vote-option').forEach(el => {
+        el.addEventListener('click', () => {
+          optionsDiv.querySelectorAll('.vote-option').forEach(o => o.classList.remove('selected'));
+          el.classList.add('selected');
+          el.querySelector('input').checked = true;
+        });
+      });
+      optionsDiv._getSplitWeights = null;
+    }
 
     if (isADA) {
       $('#voteTokenSelector').innerHTML = `
@@ -718,61 +828,73 @@ voteBtn?.addEventListener('click', submitVote);
 console.log('[vote] listener attached');
 
 async function submitVote() {
-  console.log('[vote] submitVote called');
   try {
-    const selected = $('#voteOptions input[name="voteChoice"]:checked');
-    console.log('[vote] selected:', selected);
-    if (!selected) {
-      toast('Select a voting option', 'error');
-      return;
+    const optionsDiv = $('#voteOptions');
+    const splitWeights = optionsDiv._getSplitWeights ? optionsDiv._getSplitWeights() : null;
+
+    let choice = null;
+    if (!splitWeights) {
+      const selected = document.querySelector('input[name="voteChoice"]:checked');
+      if (!selected) {
+        toast('Select a voting option', 'error');
+        return;
+      }
+      choice = selected.value;
+    }
+
+    // Validate split weights total to 100
+    if (splitWeights) {
+      const total = Object.values(splitWeights).reduce((s, v) => s + Number(v), 0);
+      if (Math.abs(total - 100) > 0.01) {
+        toast('Split weights must sum to 100%', 'error');
+        return;
+      }
     }
 
     const btn = $('#voteSubmitBtn');
     btn.disabled = true;
     btn.textContent = 'Signing...';
 
-    console.log('[vote] state:', { api: !!state.api, hexAddr: state.hexAddress?.slice(0, 20), addr: state.address?.slice(0, 20) });
-
     const proposal = state.currentProposal;
-    const choice = selected.value;
     const tokenUnit = document.querySelector('input[name="tokenUnit"]:checked')?.value || 'lovelace';
     const payload = JSON.stringify({
       proposalId: proposal.id,
-      choice,
+      choice: choice || Object.keys(splitWeights).join(','),
       timestamp: Date.now(),
     });
 
     const hexPayload = bytesToHex(new TextEncoder().encode(payload));
-    console.log('[vote] calling signData with hexPayload:', hexPayload.slice(0, 30) + '...');
-
-    console.log('[vote] signData typeof:', typeof state.api?.signData);
     const result = await state.api.signData(state.hexAddress, hexPayload);
-    console.log('[vote] signData result keys:', Object.keys(result));
+
+    const body = {
+      address: state.address,
+      addresses: state.addresses,
+      stakeAddresses: state.stakeAddresses,
+      payload,
+      signature: result.signature,
+      key: result.key,
+      proposalId: proposal.id,
+      tokenUnit,
+    };
+
+    if (splitWeights) {
+      body.splitWeights = splitWeights;
+    } else {
+      body.choice = choice;
+    }
 
     const voteRes = await fetch('/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        address: state.address,
-        addresses: state.addresses,
-        stakeAddresses: state.stakeAddresses,
-        payload,
-        signature: result.signature,
-        key: result.key,
-        proposalId: proposal.id,
-        choice,
-        tokenUnit,
-      }),
+      body: JSON.stringify(body),
     });
 
-    console.log('[vote] server response status:', voteRes.status);
     const data = await voteRes.json();
     if (!voteRes.ok) {
-      console.log('[vote] full error response:', data);
-      throw new Error(data.error + (data.debug ? ' (see console for debug info)' : ''));
+      throw new Error(data.error);
     }
 
-    toast(`Vote cast! Weight: ${formatWeight(data.stakeWeight)}`, 'success');
+    toast('Vote cast! Weight: ' + formatWeight(data.stakeWeight), 'success');
     $('#voteModal').classList.remove('open');
     fetchProposals();
   } catch (e) {
@@ -842,6 +964,163 @@ async function openAuditModal(proposalId) {
   }
 }
 
+/* ---------- Comments ---------- */
+
+async function openCommentsModal(pollId) {
+  try {
+    state.commentPollId = pollId;
+    $('#commentsModalTitle').textContent = 'Comments';
+    $('#commentInput').value = '';
+    await fetchComments(pollId);
+    $('#commentsModal').classList.add('open');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function fetchComments(pollId) {
+  try {
+    const res = await fetch('/api/comments?pollId=' + encodeURIComponent(pollId));
+    if (!res.ok) throw new Error('Failed to load comments');
+    const comments = await res.json();
+    renderComments(comments);
+  } catch (e) {
+    $('#commentsList').innerHTML = '<p class="tooltip" style="text-align:center">Could not load comments</p>';
+  }
+}
+
+function renderComments(comments) {
+  const container = $('#commentsList');
+  if (comments.length === 0) {
+    container.innerHTML = '<p class="tooltip" style="text-align:center;padding:0.5rem 0">No comments yet.</p>';
+    return;
+  }
+  container.innerHTML = comments.map(c => `
+    <div class="comment-item">
+      <div class="comment-meta">${escHtml(shorten(c.voter_address, 8))} &middot; ${new Date(c.created_at).toLocaleString()}</div>
+      <div class="comment-body">${escHtml(c.body)}</div>
+    </div>
+  `).join('');
+}
+
+$('#commentSubmitBtn')?.addEventListener('click', submitComment);
+
+async function submitComment() {
+  if (!state.api) {
+    toast('Connect your wallet first', 'error');
+    return;
+  }
+  const body = $('#commentInput').value.trim();
+  if (!body) {
+    toast('Write a comment first', 'error');
+    return;
+  }
+  if (body.length > 2000) {
+    toast('Comment too long (max 2000 characters)', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pollId: state.commentPollId,
+        voterAddress: state.address,
+        body,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('Comment posted!', 'success');
+    $('#commentInput').value = '';
+    await fetchComments(state.commentPollId);
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/* ---------- Profile ---------- */
+
+async function fetchProfile() {
+  const container = $('#profileContent');
+  if (!state.api || !state.address) {
+    container.innerHTML = '<div class="empty-state"><p>Connect your wallet to view your profile.</p></div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="empty-state"><p>Loading profile...</p></div>';
+
+  try {
+    const res = await fetch('/api/profile?address=' + encodeURIComponent(state.address));
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    renderProfile(data);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state"><strong>Could not load profile</strong><p>' + escHtml(e.message) + '</p></div>';
+  }
+}
+
+function renderProfile(data) {
+  const container = $('#profileContent');
+  const initial = state.address ? state.address[0].toUpperCase() : '?';
+
+  let html = `
+    <div class="profile-header">
+      <div class="profile-avatar">${initial}</div>
+      <div>
+        <div style="font-size:0.82rem;font-weight:600">${escHtml(shorten(data.address, 12))}</div>
+        <div class="profile-stats" style="margin-top:0.5rem">
+          <div class="profile-stat">
+            <div class="profile-stat-value">${data.totalVotes}</div>
+            <div class="profile-stat-label">Votes Cast</div>
+          </div>
+          <div class="profile-stat">
+            <div class="profile-stat-value">${data.totalCreated}</div>
+            <div class="profile-stat-label">Polls Created</div>
+          </div>
+          <div class="profile-stat">
+            <div class="profile-stat-value">${data.totalComments}</div>
+            <div class="profile-stat-label">Comments</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (data.votes && data.votes.length > 0) {
+    html += '<div class="profile-section-title">Voting History</div>';
+    for (const v of data.votes.slice(0, 20)) {
+      const prop = v.proposal;
+      const title = prop ? prop.title : 'Unknown poll';
+      const category = prop ? (prop.category || '') : '';
+      const catTag = category ? `<span class="poll-category" style="margin-right:0.3rem">${escHtml(category)}</span>` : '';
+      html += `
+        <div class="profile-vote-item">
+          <span class="profile-vote-title">${catTag}${escHtml(title)}</span>
+          <span class="profile-vote-choice">${escHtml(v.vote_choice)}</span>
+          <span class="profile-vote-weight">${formatWeight(v.stake_weight)}</span>
+        </div>
+      `;
+    }
+  } else {
+    html += '<div class="profile-empty">No votes cast yet.</div>';
+  }
+
+  if (data.created && data.created.length > 0) {
+    html += '<div class="profile-section-title">Polls Created</div>';
+    for (const p of data.created.slice(0, 10)) {
+      html += `
+        <div class="profile-vote-item">
+          <span class="profile-vote-title"><span class="poll-category" style="margin-right:0.3rem">${escHtml(p.category || 'General')}</span>${escHtml(p.title)}</span>
+          <span class="profile-vote-weight">${new Date(p.created_at).toLocaleDateString()}</span>
+        </div>
+      `;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
 /* ---------- Create Proposal ---------- */
 
 $('#createBtn').addEventListener('click', () => {
@@ -896,6 +1175,9 @@ async function createProposal() {
   const tokenVal = $('#propTokenSelect').value;
   const policy = $('#propPolicy').value.trim();
   const asset = $('#propAsset').value.trim();
+  const optionsRaw = $('#propOptions').value.trim();
+  const category = $('#propCategory').value;
+  const votingType = $('#propVotingType').value;
 
   if (!title || !description) {
     toast('Fill in title and description', 'error');
@@ -921,6 +1203,23 @@ async function createProposal() {
     return;
   }
 
+  // Parse options
+  const options = optionsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  if (options.length < 2) {
+    toast('Enter at least 2 options (comma-separated)', 'error');
+    return;
+  }
+  if (options.length > 8) {
+    toast('Maximum 8 options allowed', 'error');
+    return;
+  }
+  for (const opt of options) {
+    if (opt.length > 100) {
+      toast('Each option must be 100 characters or fewer', 'error');
+      return;
+    }
+  }
+
   const btn = $('#createSubmitBtn');
   btn.disabled = true;
   btn.textContent = 'Creating...';
@@ -932,6 +1231,9 @@ async function createProposal() {
       body: JSON.stringify({
         title,
         description,
+        options,
+        category,
+        votingType,
         targetPolicyId: policy,
         targetAssetName: asset,
         creatorAddress: state.address,
@@ -943,7 +1245,7 @@ async function createProposal() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    toast('Proposal created!', 'success');
+    toast('Poll created!', 'success');
     $('#createModal').classList.remove('open');
     $('#propTitle').value = '';
     $('#propDesc').value = '';
@@ -956,7 +1258,7 @@ async function createProposal() {
     toast('Failed: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Create Proposal';
+    btn.textContent = 'Create Poll';
   }
 }
 
@@ -1264,8 +1566,9 @@ $$('.tab').forEach(tab => {
     $$('.tab').forEach(t => t.classList.remove('tab-active'));
     tab.classList.add('tab-active');
     const view = tab.dataset.view;
-    $('#mainView').style.display = view === 'proposals' ? '' : 'none';
+    $('#mainView').style.display = view === 'polls' ? '' : 'none';
     $('#portfolioView').style.display = view === 'portfolio' ? '' : 'none';
+    $('#profileView').style.display = view === 'profile' ? '' : 'none';
     $('#surfView').style.display = view === 'surf' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
@@ -1273,6 +1576,9 @@ $$('.tab').forEach(tab => {
       } else {
         fetchPortfolio();
       }
+    }
+    if (view === 'profile') {
+      fetchProfile();
     }
     if (view === 'surf') {
       fetchSurfDashboard();
@@ -1663,6 +1969,18 @@ function startEpochTicker() {
   epochInterval = setInterval(fetchEpoch, 60000);
   epochTickInterval = setInterval(renderEpoch, 1000);
 }
+
+/* ---------- Poll Search & Filter ---------- */
+
+$('#pollSearch')?.addEventListener('input', (e) => {
+  state.pollSearch = e.target.value;
+  renderProposals();
+});
+
+$('#pollCategoryFilter')?.addEventListener('change', (e) => {
+  state.pollCategory = e.target.value;
+  renderProposals();
+});
 
 /* ---------- Init ---------- */
 

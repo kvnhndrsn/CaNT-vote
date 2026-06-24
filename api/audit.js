@@ -37,15 +37,39 @@ export default async function handler(req, res) {
 
     const { data: votes, error: votesErr } = await supabase
       .from('votes')
-      .select('voter_address, vote_choice, stake_weight, signature_hex, key_hex, created_at')
+      .select('voter_address, vote_choice, stake_weight, split_weights, signature_hex, key_hex, created_at')
       .eq('proposal_id', proposalId)
       .order('created_at', { ascending: true });
 
     if (votesErr) throw votesErr;
 
+    // Compute detailed tally
+    const tally = {};
+    let totalWeight = 0n;
+    for (const v of votes) {
+      if (v.split_weights) {
+        for (const [opt, pct] of Object.entries(v.split_weights)) {
+          const alloc = BigInt(Math.floor(Number(BigInt(v.stake_weight)) * Number(pct) / 100));
+          tally[opt] = (tally[opt] || 0n) + alloc;
+        }
+      } else {
+        tally[v.vote_choice] = (tally[v.vote_choice] || 0n) + BigInt(v.stake_weight);
+      }
+      totalWeight += BigInt(v.stake_weight);
+    }
+    const formattedTally = {};
+    for (const [choice, weight] of Object.entries(tally)) {
+      formattedTally[choice] = weight.toString();
+    }
+
     return res.json({
       proposal,
-      votes,
+      votes: votes.map(v => ({
+        ...v,
+        split_weights: v.split_weights || null,
+      })),
+      tally: formattedTally,
+      totalWeight: totalWeight.toString(),
       metadata: {
         exportGeneratedAt: new Date().toISOString(),
         totalVoters: votes.length,
