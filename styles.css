@@ -542,16 +542,16 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 .surf-stat-value.surf-pos { color: var(--success); }
 .surf-stat-value.surf-neg { color: var(--danger); }
 
-.surf-stat-ada {
+.surf-stat-usd {
   display: block;
-  font-size: 0.65rem;
-  font-weight: 600;
+  font-size: 0.6rem;
+  font-weight: 500;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
-  margin-top: 0.05rem;
+  margin-top: 0.02rem;
 }
-.surf-stat-ada.surf-pos { color: var(--success); }
-.surf-stat-ada.surf-neg { color: var(--danger); }
+.surf-stat-usd.surf-pos { color: var(--success); }
+.surf-stat-usd.surf-neg { color: var(--danger); }
 
 .surf-filters {
   display: flex;

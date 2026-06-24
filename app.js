@@ -1358,18 +1358,18 @@ function renderSurfSummary(summary) {
     <div class="surf-summary-grid">
       <div class="surf-stat">
         <span class="surf-stat-label">Total Borrowed</span>
-        <span class="surf-stat-value">${fmtUSD(summary.totalBorrowedUSD)}</span>
-        <span class="surf-stat-ada">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
+        <span class="surf-stat-value">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.totalBorrowedUSD)}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Total Collateral</span>
-        <span class="surf-stat-value">${fmtUSD(summary.totalCollateralUSD)}</span>
-        <span class="surf-stat-ada">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
+        <span class="surf-stat-value">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.totalCollateralUSD)}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Net Position Value</span>
-        <span class="surf-stat-value ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(summary.totalNetValueUSD)}</span>
-        <span class="surf-stat-ada ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
+        <span class="surf-stat-value ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
+        <span class="surf-stat-usd ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(summary.totalNetValueUSD)}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Open Positions</span>
@@ -1377,8 +1377,8 @@ function renderSurfSummary(summary) {
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">SURF Price</span>
-        <span class="surf-stat-value">${fmtUSD(summary.surfPrice)}</span>
-        <span class="surf-stat-ada">${fmtADA(toADA(summary.surfPrice))}</span>
+        <span class="surf-stat-value">${fmtADA(toADA(summary.surfPrice))}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.surfPrice)}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">ADA Price</span>

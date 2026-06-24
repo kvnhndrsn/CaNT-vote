@@ -95,66 +95,60 @@ export default async function handler(req, res) {
         const accruedInterest = principal * interestRate * elapsedYears;
         const totalOwed = principal + accruedInterest;
 
-        const principalTicker = pos.principalAsset?.policyId ? (pos.principalAsset?.policyId.slice(0, 6) + '..') : 'ADA';
-        const collateralTicker = pos.collateralAsset?.policyId ? (pos.collateralAsset?.policyId.slice(0, 6) + '..') : 'ADA';
+        const poolAsset = pool?.asset || { ticker: '?', decimals: 6, policyId: '' };
+        const principalDecimals = poolAsset.decimals || 6;
+        const isCollateralADA = !pos.collateralAsset?.policyId;
 
-        let principalPriceUSD = 0;
-        let collateralPriceUSD = 0;
+        let collInfo = null;
+        if (pool && !isCollateralADA) {
+          collInfo = pool.collateralAssets.find(c =>
+            c.policyId === pos.collateralAsset.policyId &&
+            c.assetName === pos.collateralAsset.assetName
+          );
+        }
+        const collateralDecimals = isCollateralADA ? 6 : (collInfo?.decimals || 0);
 
-        if (!pos.principalAsset?.policyId) {
-          principalPriceUSD = adaPrice;
-          if (pool) principalPriceUSD = pool.price || adaPrice;
-        } else {
-          if (pool) {
-            for (const c of pool.collateralAssets) {
-              if (c.policyId === pos.principalAsset.policyId && c.assetName === pos.principalAsset.assetName) {
-                principalPriceUSD = c.price;
-              }
-            }
-          }
+        const principalTicker = poolAsset.ticker || (poolAsset.policyId ? poolAsset.policyId.slice(0, 6) + '..' : 'ADA');
+        const collateralTicker = isCollateralADA ? 'ADA' : (collInfo?.ticker || '?');
+
+        const principalPriceADA = pool?.price || 1;
+        let collateralPriceADA = 0;
+        if (isCollateralADA) {
+          collateralPriceADA = 1;
+        } else if (collInfo) {
+          collateralPriceADA = (collInfo.price || 0) * principalPriceADA;
         }
 
-        if (!pos.collateralAsset?.policyId) {
-          collateralPriceUSD = adaPrice;
-          if (pool) {
-            const poolAsset = pool.asset;
-            if (!poolAsset.policyId) collateralPriceUSD = pool.price || adaPrice;
-          }
-        } else {
-          if (pool) {
-            for (const c of pool.collateralAssets) {
-              if (c.policyId === pos.collateralAsset.policyId && c.assetName === pos.collateralAsset.assetName) {
-                collateralPriceUSD = c.price;
-              }
-            }
-          }
-        }
+        const principalValueADA = (principal / Math.pow(10, principalDecimals)) * principalPriceADA;
+        const totalOwedADA = (totalOwed / Math.pow(10, principalDecimals)) * principalPriceADA;
+        const collateralADA = collateralPriceADA > 0 ? (collateral / Math.pow(10, collateralDecimals)) * collateralPriceADA : 0;
+        const netValueADA = collateralADA - totalOwedADA;
 
-        const poolAsset = pool?.asset || {};
-        const decimals = pos.principalAsset?.policyId ? (poolAsset.decimals || 0) : 6;
-        const collDecimals = pos.collateralAsset?.policyId ? (poolAsset.decimals || 0) : 6;
+        const principalValueUSD = principalValueADA * adaPrice;
+        const totalOwedUSD = totalOwedADA * adaPrice;
+        const collateralValueUSD = collateralADA * adaPrice;
+        const netValueUSD = netValueADA * adaPrice;
+        const principalPriceUSD = principalPriceADA * adaPrice;
+        const collateralPriceUSD = collateralPriceADA * adaPrice;
 
-        const principalValueUSD = (principal / Math.pow(10, decimals)) * principalPriceUSD;
-        const totalOwedUSD = (totalOwed / Math.pow(10, decimals)) * principalPriceUSD;
-        const collateralValueUSD = (collateral / Math.pow(10, collDecimals)) * collateralPriceUSD;
-        const netValueUSD = collateralValueUSD - totalOwedUSD;
+        const computedLtv = collateralADA > 0 ? totalOwedADA / collateralADA : 0;
 
         positions.push({
           poolId,
           address: pos.address,
           principal,
-          principalDecimals: decimals,
+          principalDecimals,
           principalTicker,
           principalPolicyId: pos.principalAsset?.policyId || '',
           principalAssetName: pos.principalAsset?.assetName || '',
           collateral,
-          collateralDecimals: collDecimals,
+          collateralDecimals,
           collateralTicker,
           collateralPolicyId: pos.collateralAsset?.policyId || '',
           collateralAssetName: pos.collateralAsset?.assetName || '',
           interestRate,
           startTime: pos.startTime,
-          ltv: collateralValueUSD > 0 ? totalOwedUSD / collateralValueUSD : 0,
+          ltv: computedLtv,
           borrowId: pos.borrowId || null,
           outRef: pos.outRef || null,
           elapsedYears,
@@ -172,8 +166,10 @@ export default async function handler(req, res) {
 
     const poolsArray = poolEntries.map(p => {
       const decimals = p.asset.decimals || 0;
-      const totalSuppliedUSD = (p.totalSupplied / Math.pow(10, decimals)) * p.price;
-      const totalBorrowedUSD = (p.totalBorrowed / Math.pow(10, decimals)) * p.price;
+      const totalSuppliedADA = (p.totalSupplied / Math.pow(10, decimals)) * p.price;
+      const totalBorrowedADA = (p.totalBorrowed / Math.pow(10, decimals)) * p.price;
+      const totalSuppliedUSD = totalSuppliedADA * adaPrice;
+      const totalBorrowedUSD = totalBorrowedADA * adaPrice;
       return {
         ...p,
         totalSuppliedUSD,
