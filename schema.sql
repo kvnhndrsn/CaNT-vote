@@ -199,6 +199,26 @@ CREATE TABLE IF NOT EXISTS surf_pool_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_surf_pool_snapshots_pool_time ON surf_pool_snapshots(pool_id, snapshot_at);
 
+-- Surf activities (aggregated on-chain events, deduplicated by tx_hash)
+CREATE TABLE IF NOT EXISTS surf_activities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    activity_type VARCHAR(50) NOT NULL,
+    address VARCHAR(255) NOT NULL DEFAULT '',
+    amount NUMERIC(40,0) NOT NULL DEFAULT 0,
+    asset VARCHAR(128) NOT NULL DEFAULT '',
+    collateral_amount NUMERIC(40,0) NOT NULL DEFAULT 0,
+    collateral_asset VARCHAR(128) NOT NULL DEFAULT '',
+    pool_id VARCHAR(100) NOT NULL DEFAULT '',
+    tx_hash VARCHAR(128) NOT NULL,
+    activity_time BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_surf_activities_tx ON surf_activities(tx_hash);
+CREATE INDEX IF NOT EXISTS idx_surf_activities_time ON surf_activities(activity_time DESC);
+CREATE INDEX IF NOT EXISTS idx_surf_activities_type ON surf_activities(activity_type);
+CREATE INDEX IF NOT EXISTS idx_surf_activities_address ON surf_activities(address);
+
 -- Cleanup (optional, run manually):
 -- DELETE FROM surf_protocol_snapshots WHERE snapshot_at < NOW() - INTERVAL '90 days';
 -- DELETE FROM surf_pool_snapshots WHERE snapshot_at < NOW() - INTERVAL '90 days';

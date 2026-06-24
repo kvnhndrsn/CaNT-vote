@@ -1574,6 +1574,7 @@ $$('.tab').forEach(tab => {
     $('#profileView').style.display = view === 'profile' ? '' : 'none';
     $('#surfView').style.display = view === 'surf' ? '' : 'none';
     $('#analyticsView').style.display = view === 'analytics' ? '' : 'none';
+    $('#activityView').style.display = view === 'activity' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
         $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
@@ -1602,6 +1603,16 @@ $$('.tab').forEach(tab => {
     }
     if (view === 'analytics') {
       renderAnalytics();
+    }
+    if (view === 'activity') {
+      fetchActivity();
+      if (activityInterval) clearInterval(activityInterval);
+      activityInterval = setInterval(fetchActivity, 30000);
+    } else {
+      if (activityInterval) {
+        clearInterval(activityInterval);
+        activityInterval = null;
+      }
     }
   });
 });
@@ -2082,6 +2093,82 @@ $$('.unit-btn').forEach(btn => {
     analyticsUnit = btn.dataset.unit;
     renderAnalytics();
   });
+});
+
+/* ---------- Activity ---------- */
+
+let activityPage = 1;
+let activityInterval = null;
+
+async function fetchActivity() {
+  const container = $('#activityContent');
+  const pagination = $('#activityPagination');
+  const type = $('#activityTypeFilter').value;
+  const address = $('#activityAddressFilter').value;
+
+  try {
+    let url = '/api/activity?page=' + activityPage + '&per_page=50';
+    if (type) url += '&type=' + encodeURIComponent(type);
+    if (address) url += '&address=' + encodeURIComponent(address);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    renderActivity(data, container, pagination);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state"><p>Error: ' + escHtml(e.message) + '</p></div>';
+    pagination.innerHTML = '';
+  }
+}
+
+function renderActivity(data, container, pagination) {
+  if (!data.data || data.data.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No activity found.</p></div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(data.total / data.per_page);
+  $('#activityUpdated').textContent = data.total + ' events';
+
+  let html = '<table class="activity-table"><thead><tr>';
+  html += '<th>Type</th><th>Amount</th><th>Pool</th><th>Address</th><th>Time</th><th>Tx</th>';
+  html += '</tr></thead><tbody>';
+
+  for (const a of data.data) {
+    const typeClass = 'activity-type-' + a.activity_type.toLowerCase().replace(/\s+/g, '-');
+    html += '<tr>';
+    html += '<td><span class="activity-type-badge ' + typeClass + '">' + escHtml(a.activity_type) + '</span></td>';
+    html += '<td class="activity-amount">' + escHtml(a.amount_fmt) + '</td>';
+    html += '<td>' + escHtml(a.pool_ticker) + '</td>';
+    html += '<td title="' + escHtml(a.address) + '">' + escHtml(a.address_short) + '</td>';
+    html += '<td class="activity-time">' + escHtml(a.time_ago) + '</td>';
+    html += '<td><a href="' + a.cardanoscan_link + '" target="_blank" rel="noopener" class="activity-tx-link">view</a></td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  let p = '<div class="activity-page-info">Page ' + data.page + ' of ' + totalPages + '</div><div class="activity-page-btns">';
+  if (data.page > 1) p += '<button class="btn btn-sm activity-page-btn" data-page="' + (data.page - 1) + '">← Prev</button>';
+  if (data.page < totalPages) p += '<button class="btn btn-sm activity-page-btn" data-page="' + (data.page + 1) + '">Next →</button>';
+  p += '</div>';
+  pagination.innerHTML = p;
+
+  pagination.querySelectorAll('.activity-page-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activityPage = parseInt(btn.dataset.page);
+      fetchActivity();
+    });
+  });
+}
+
+$('#activityTypeFilter')?.addEventListener('change', () => { activityPage = 1; fetchActivity(); });
+
+let activityAddressTimeout;
+$('#activityAddressFilter')?.addEventListener('input', () => {
+  clearTimeout(activityAddressTimeout);
+  activityAddressTimeout = setTimeout(() => { activityPage = 1; fetchActivity(); }, 400);
 });
 
 /* ---------- Epoch ---------- */

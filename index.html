@@ -29,6 +29,7 @@
     <button class="tab" data-view="profile">My Profile</button>
     <button class="tab" data-view="surf">Surf Lending <span class="badge badge-beta">Beta</span></button>
     <button class="tab" data-view="analytics">Analytics</button>
+    <button class="tab" data-view="activity">Activity</button>
   </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
@@ -129,6 +130,33 @@
         <p>No snapshot data yet. Run the snapshot endpoint to start collecting data.</p>
       </div>
     </div>
+  </div>
+  <div id="activityView" style="display:none">
+    <div class="activity-header">
+      <div class="section-title">
+        <span>Protocol Activity</span>
+        <span class="badge badge-surf">Live</span>
+      </div>
+      <div class="activity-filters">
+        <select id="activityTypeFilter" class="activity-filter-select">
+          <option value="">All Types</option>
+          <option value="Borrow">Borrow</option>
+          <option value="Repay">Repay</option>
+          <option value="Deposit">Deposit</option>
+          <option value="Withdraw">Withdraw</option>
+          <option value="Add Collateral">Add Collateral</option>
+          <option value="Cancel Borrow">Cancel Borrow</option>
+          <option value="Leveraged Borrow">Leveraged Borrow</option>
+          <option value="Repay With Collateral">Repay With Collateral</option>
+        </select>
+        <input type="text" id="activityAddressFilter" placeholder="Filter by address..." class="activity-filter-input">
+        <span id="activityUpdated" class="activity-updated"></span>
+      </div>
+    </div>
+    <div id="activityContent">
+      <div class="empty-state"><p>Loading activity...</p></div>
+    </div>
+    <div class="activity-pagination" id="activityPagination"></div>
   </div>
 </main>
 
