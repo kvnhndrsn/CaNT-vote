@@ -1377,8 +1377,8 @@ function renderSurfSummary(summary) {
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">SURF Price</span>
-        <span class="surf-stat-value">${fmtADA(toADA(summary.surfPrice))}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.surfPrice)}</span>
+        <span class="surf-stat-value">${fmtADA(summary.surfPrice)}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.surfPriceUSD)}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">ADA Price</span>

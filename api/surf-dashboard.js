@@ -187,8 +187,9 @@ export default async function handler(req, res) {
         totalBorrowedUSD: positions.reduce((s, p) => s + p.totalOwedUSD, 0),
         totalCollateralUSD: positions.reduce((s, p) => s + p.collateralValueUSD, 0),
         totalNetValueUSD: positions.reduce((s, p) => s + p.netValueUSD, 0),
-        surfPrice,
-        adaPrice,
+        surfPrice,      // ada per SURF
+        surfPriceUSD: surfPrice * adaPrice,
+        adaPrice,       // usd per ADA
         fetchedAt: Date.now(),
       },
     });
