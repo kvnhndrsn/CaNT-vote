@@ -811,30 +811,6 @@ select.surf-input {
   margin-bottom: 0.4rem;
 }
 
-.analytics-card-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-
-.analytics-select {
-  padding: 0.2rem 0.45rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.72rem;
-  font-family: inherit;
-  outline: none;
-  cursor: pointer;
-}
-
-.analytics-select:focus {
-  border-color: var(--primary);
-}
-
 .analytics-chart-wrap {
   position: relative;
   height: 180px;

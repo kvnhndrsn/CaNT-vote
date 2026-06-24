@@ -184,6 +184,7 @@ export default async function handler(req, res) {
       summary: {
         totalPositions: positions.length,
         totalPools: poolsArray.length,
+        totalSuppliedUSD: poolsArray.reduce((s, p) => s + p.totalSuppliedUSD, 0),
         totalBorrowedUSD: positions.reduce((s, p) => s + p.totalOwedUSD, 0),
         totalCollateralUSD: positions.reduce((s, p) => s + p.collateralValueUSD, 0),
         totalNetValueUSD: positions.reduce((s, p) => s + p.netValueUSD, 0),

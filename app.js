@@ -1701,8 +1701,9 @@ function renderSurfSummary(summary) {
         <span class="surf-stat-usd">${fmtUSD(summary.surfPriceUSD)}</span>
       </div>
       <div class="surf-stat">
-        <span class="surf-stat-label">ADA Price</span>
-        <span class="surf-stat-value">${fmtUSD(summary.adaPrice)}</span>
+        <span class="surf-stat-label">Total TVL</span>
+        <span class="surf-stat-value">${fmtADA(toADA(summary.totalSuppliedUSD))}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.totalSuppliedUSD)}</span>
       </div>
     </div>
   `;
@@ -1904,7 +1905,6 @@ function analyticsThemeColors() {
 async function renderAnalytics() {
   const container = $('#analyticsContent');
   const empty = $('#analyticsEmpty');
-  const poolSelect = $('#analyticsPoolSelect');
 
   try {
     const days = analyticsDays > 0 ? analyticsDays : 3650;
@@ -2007,52 +2007,7 @@ async function renderAnalytics() {
       options: { ...base(), scales: { x: xAxis(), y: yAxis(pctTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
     });
 
-    // 5 — Per-Pool
-    const poolIds = data.availablePools || [];
-    const prevVal = poolSelect.value;
-    poolSelect.innerHTML = '<option value="">All Pools</option>' + poolIds.map(id => '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>').join('');
-    poolSelect.value = prevVal || '';
-
-    let poolSnaps = null;
-    if (prevVal) {
-      try {
-        const pr = await fetch('/api/graph?type=pools&pool_id=' + encodeURIComponent(prevVal) + '&from=' + encodeURIComponent(from));
-        poolSnaps = await pr.json();
-        if (!Array.isArray(poolSnaps)) poolSnaps = null;
-      } catch { poolSnaps = null; }
-    }
-
-    const ctx5 = document.querySelector('#chartPool canvas');
-    if (poolSnaps && poolSnaps.length > 2) {
-      const pl = poolSnaps.map(s => { const d = new Date(s.snapshot_at); return (d.getMonth() + 1) + '/' + d.getDate(); });
-      mkChart(ctx5, {
-        type: 'line',
-        data: {
-          labels: pl,
-          datasets: [
-            { label: 'Supplied', data: poolSnaps.map(s => s.total_supplied_usd), borderColor: C.accent, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-            { label: 'Borrowed', data: poolSnaps.map(s => s.total_borrowed_usd), borderColor: C.amber, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-            { label: 'APR', data: poolSnaps.map(s => (s.borrow_apr || 0) * 100), borderColor: C.red, tension: 0.3, pointRadius: 0, yAxisID: 'y1' },
-          ],
-        },
-        options: {
-          ...base(),
-          scales: {
-            x: xAxis(),
-            y: { ...yAxis(usdTick), position: 'left', beginAtZero: true },
-            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: C.text, font: { size: 9 }, callback: pctTick } },
-          },
-          plugins: { legend: { ...lo(C.text), position: 'bottom' } },
-        },
-      });
-    } else {
-      mkChart(ctx5, {
-        type: 'bar', data: { labels: ['Select a pool'], datasets: [{ label: '', data: [0], backgroundColor: 'transparent' }] },
-        options: { ...base(), plugins: { legend: { display: false } } },
-      });
-    }
-
-    // 6 — Market Composition
+    // 5 — Market Composition
     const last = snap[snap.length - 1];
     const bd = last.pool_breakdown || {};
     const names = Object.keys(bd);
@@ -2098,8 +2053,6 @@ $$('.chart-range').forEach(btn => {
     renderAnalytics();
   });
 });
-
-$('#analyticsPoolSelect')?.addEventListener('change', renderAnalytics);
 
 /* ---------- Epoch ---------- */
 
