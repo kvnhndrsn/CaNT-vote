@@ -1886,6 +1886,7 @@ $('#surfStatusFilter')?.addEventListener('change', (e) => {
 
 let analyticsCharts = [];
 let analyticsDays = 7;
+let analyticsUnit = 'usd';
 
 function destroyAnalyticsCharts() {
   for (const c of analyticsCharts) { if (c) c.destroy(); }
@@ -1923,6 +1924,8 @@ async function renderAnalytics() {
 
     const C = analyticsThemeColors();
     const snap = data.snapshots;
+    const isAda = analyticsUnit === 'ada';
+    const toUnit = (usd, adaPrice) => isAda && adaPrice ? usd / adaPrice : usd;
     const labels = snap.map(s => {
       const d = new Date(s.snapshot_at);
       return (d.getMonth() + 1) + '/' + d.getDate();
@@ -1949,7 +1952,9 @@ async function renderAnalytics() {
       return { grid: { color: C.grid }, ticks: { color: C.text, font: { size: 9 }, callback: (v) => fmt(v) } };
     }
 
+    const adaTick = (v) => v >= 1e6 ? '₳' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '₳' + (v / 1e3).toFixed(0) + 'K' : '₳' + v.toFixed(0);
     const usdTick = (v) => v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + v.toFixed(0);
+    const moneyTick = isAda ? adaTick : usdTick;
     const pctTick = (v) => v.toFixed(1) + '%';
     const numTick = (v) => v.toFixed(0);
 
@@ -1963,11 +1968,11 @@ async function renderAnalytics() {
     mkChart(document.querySelector('#chartTvl canvas'), {
       type: 'line',
       data: sci([
-        { label: 'Total Supplied', data: snap.map(s => s.total_supplied_usd), borderColor: C.accent, backgroundColor: C.accent + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Total Borrowed', data: snap.map(s => s.total_borrowed_usd), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Net Value', data: snap.map(s => s.total_net_value_usd), borderColor: C.green, borderDash: [3, 3], tension: 0.3, pointRadius: 0 },
+        { label: 'Total Supplied', data: snap.map(s => toUnit(s.total_supplied_usd, s.ada_price)), borderColor: C.accent, backgroundColor: C.accent + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Total Borrowed', data: snap.map(s => toUnit(s.total_borrowed_usd, s.ada_price)), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Net Value', data: snap.map(s => toUnit(s.total_net_value_usd, s.ada_price)), borderColor: C.green, borderDash: [3, 3], tension: 0.3, pointRadius: 0 },
       ]),
-      options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+      options: { ...base(), scales: { x: xAxis(), y: yAxis(moneyTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
     });
 
     // 2 — Position Health
@@ -1986,15 +1991,26 @@ async function renderAnalytics() {
     });
 
     // 3 — Prices
-    mkChart(document.querySelector('#chartPrices canvas'), {
-      type: 'line',
-      data: sci([
-        { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
-        { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
-        { label: 'SURF (USD)', data: snap.map(s => s.surf_price_usd), borderColor: C.purple, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
-      ]),
-      options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
-    });
+    if (isAda) {
+      mkChart(document.querySelector('#chartPrices canvas'), {
+        type: 'line',
+        data: sci([
+          { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
+          { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
+        ]),
+        options: { ...base(), scales: { x: xAxis(), y: yAxis((v) => v >= 1 ? '$' + v.toFixed(2) : '¢' + (v * 100).toFixed(1)) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+      });
+    } else {
+      mkChart(document.querySelector('#chartPrices canvas'), {
+        type: 'line',
+        data: sci([
+          { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
+          { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
+          { label: 'SURF (USD)', data: snap.map(s => s.surf_price_usd), borderColor: C.purple, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
+        ]),
+        options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
+      });
+    }
 
     // 4 — Avg LTV & APR
     mkChart(document.querySelector('#chartLtv canvas'), {
@@ -2009,6 +2025,7 @@ async function renderAnalytics() {
 
     // 5 — Market Composition
     const last = snap[snap.length - 1];
+    const adaPrice = last.ada_price || 1;
     const bd = last.pool_breakdown || {};
     const names = Object.keys(bd);
     const poolColors = [C.accent, C.blue, C.green, C.amber, C.purple, C.cyan, C.red];
@@ -2017,7 +2034,7 @@ async function renderAnalytics() {
       data: {
         labels: names.map(id => bd[id]?.ticker || id),
         datasets: [{
-          data: names.map(id => bd[id]?.supplied_usd || 0),
+          data: names.map(id => toUnit(bd[id]?.supplied_usd || 0, adaPrice)),
           backgroundColor: names.map((_, i) => poolColors[i % poolColors.length]),
           borderWidth: 0,
         }],
@@ -2032,7 +2049,10 @@ async function renderAnalytics() {
             callbacks: {
               label: (ctx) => {
                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                return ' ' + ctx.label + ': $' + (ctx.parsed / 1e6).toFixed(2) + 'M (' + ((ctx.parsed / total) * 100).toFixed(1) + '%)';
+                const prefix = isAda ? '₳' : '$';
+                const val = ctx.parsed;
+                const fmt = val >= 1e6 ? (val / 1e6).toFixed(2) + 'M' : val >= 1e3 ? (val / 1e3).toFixed(1) + 'K' : val.toFixed(0);
+                return ' ' + ctx.label + ': ' + prefix + fmt + ' (' + ((ctx.parsed / total) * 100).toFixed(1) + '%)';
               },
             },
           },
@@ -2050,6 +2070,15 @@ $$('.chart-range').forEach(btn => {
     $$('.chart-range').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     analyticsDays = parseInt(btn.dataset.days);
+    renderAnalytics();
+  });
+});
+
+$$('.unit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.unit-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    analyticsUnit = btn.dataset.unit;
     renderAnalytics();
   });
 });

@@ -785,6 +785,29 @@ select.surf-input {
   border-color: var(--primary);
 }
 
+.analytics-unit-toggle {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.analytics-unit-toggle .unit-btn {
+  border: none;
+  border-radius: 0;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.45rem;
+  background: var(--surface2);
+  color: var(--text3);
+  cursor: pointer;
+}
+
+.analytics-unit-toggle .unit-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
 .analytics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
