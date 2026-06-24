@@ -1913,7 +1913,7 @@ async function renderAnalytics() {
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
 
-    if (!data.snapshots || data.snapshots.length < 2) {
+    if (!data.snapshots || data.snapshots.length < 1) {
       container.style.display = 'none'; empty.style.display = '';
       return;
     }
