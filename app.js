@@ -1276,6 +1276,19 @@ $$('.tab').forEach(tab => {
     }
     if (view === 'surf') {
       fetchSurfDashboard();
+      if (surfRefreshInterval) clearInterval(surfRefreshInterval);
+      surfRefreshInterval = setInterval(fetchSurfDashboard, 60000);
+      if (surfTickInterval) clearInterval(surfTickInterval);
+      surfTickInterval = setInterval(updateSurfUpdated, 10000);
+    } else {
+      if (surfRefreshInterval) {
+        clearInterval(surfRefreshInterval);
+        surfRefreshInterval = null;
+      }
+      if (surfTickInterval) {
+        clearInterval(surfTickInterval);
+        surfTickInterval = null;
+      }
     }
   });
 });
@@ -1292,7 +1305,10 @@ let surfData = null;
 let surfFilterAddr = '';
 let surfFilterPool = '';
 let surfFilterStatus = '';
+let surfSortBy = 'ltv-desc';
 let surfRefreshInterval = null;
+let surfTickInterval = null;
+let surfLastUpdated = null;
 
 async function fetchSurfDashboard() {
   const container = $('#surfContent');
@@ -1302,9 +1318,24 @@ async function fetchSurfDashboard() {
     const res = await fetch('/api/surf-dashboard?' + params.toString());
     if (!res.ok) throw new Error((await res.json()).error);
     surfData = await res.json();
+    surfLastUpdated = Date.now();
     renderSurfDashboard();
+    updateSurfUpdated();
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><strong>Could not load Surf data</strong><p>' + escHtml(e.message) + '</p></div>';
+  }
+}
+
+function updateSurfUpdated() {
+  const el = $('#surfUpdated');
+  if (!el || !surfLastUpdated) return;
+  const ago = Math.floor((Date.now() - surfLastUpdated) / 1000);
+  if (ago < 5) {
+    el.textContent = 'Updated just now';
+  } else if (ago < 60) {
+    el.textContent = 'Updated ' + ago + 's ago';
+  } else {
+    el.textContent = 'Updated ' + Math.floor(ago / 60) + 'm ago';
   }
 }
 
@@ -1386,6 +1417,27 @@ function renderSurfPositions(positions, pools, summary) {
     });
   }
 
+  const sortFns = {
+    'ltv-desc': (a, b) => (b.ltv || 0) - (a.ltv || 0),
+    'ltv-asc': (a, b) => (a.ltv || 0) - (b.ltv || 0),
+    'value-desc': (a, b) => (b.netValueUSD || 0) - (a.netValueUSD || 0),
+    'value-asc': (a, b) => (a.netValueUSD || 0) - (b.netValueUSD || 0),
+    'owed-desc': (a, b) => (b.totalOwedUSD || 0) - (a.totalOwedUSD || 0),
+    'collateral-desc': (a, b) => (b.collateralValueUSD || 0) - (a.collateralValueUSD || 0),
+    'duration-desc': (a, b) => (b.elapsedYears || 0) - (a.elapsedYears || 0),
+    'duration-asc': (a, b) => (a.elapsedYears || 0) - (b.elapsedYears || 0),
+    'apr-desc': (a, b) => (b.interestRate || 0) - (a.interestRate || 0),
+    'health': (a, b) => {
+      const hA = a.ltv >= 0.75 ? 2 : a.ltv >= 0.5 ? 1 : 0;
+      const hB = b.ltv >= 0.75 ? 2 : b.ltv >= 0.5 ? 1 : 0;
+      return hB - hA;
+    },
+  };
+
+  if (sortFns[surfSortBy]) {
+    filtered.sort(sortFns[surfSortBy]);
+  }
+
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>No positions match your filters.</p></div>';
     return;
@@ -1418,26 +1470,63 @@ function renderSurfPositions(positions, pools, summary) {
     return 'Healthy';
   }
 
-  let html = `<div class="surf-count">${filtered.length} position${filtered.length !== 1 ? 's' : ''}</div>`;
+  function poolDisplayName(pool) {
+    if (!pool) return '';
+    const borrowed = pool.asset.ticker;
+    const collaterals = pool.collateralAssets.map(c => c.ticker).filter(Boolean);
+    if (collaterals.length === 0) return borrowed;
+    if (collaterals.length === 1) return borrowed + '/' + collaterals[0];
+    return borrowed + '/' + collaterals.slice(0, 2).join('+') + (collaterals.length > 2 ? '...' : '');
+  }
+
+  function ltvBarColor(pct) {
+    if (pct >= 0.75) return '#ef4444';
+    if (pct >= 0.5) return '#f59e0b';
+    return '#22c55e';
+  }
+
+  const atRisk = filtered.filter(p => p.ltv >= 0.5).length;
+  const totalBorrowUSD = filtered.reduce((s, p) => s + p.totalOwedUSD, 0);
+  const totalCollateralUSD = filtered.reduce((s, p) => s + p.collateralValueUSD, 0);
+  const weightedApr = filtered.reduce((s, p) => s + (p.interestRate || 0) * (p.totalOwedUSD || 0), 0) / (totalBorrowUSD || 1);
+
+  let html = `<div class="surf-count-bar">`;
+  html += `<span class="surf-count">${filtered.length} position${filtered.length !== 1 ? 's' : ''}</span>`;
+  html += `<span class="surf-stats-mini">`;
+  html += `<span class="surf-mini-stat">At Risk: <strong>${atRisk}</strong></span>`;
+  html += `<span class="surf-mini-stat">Avg APR: <strong>${fmtPct(weightedApr)}</strong></span>`;
+  html += `<span class="surf-mini-stat">Ratio: <strong>${(totalCollateralUSD / (totalBorrowUSD || 1)).toFixed(2)}x</strong></span>`;
+  html += `</span>`;
+  html += `</div>`;
+
   html += '<div class="surf-position-list">';
 
   for (const p of filtered) {
     const pool = pools ? pools.find(po => po.poolId === p.poolId) : null;
-    const poolName = pool ? (pool.asset.ticker + (pool.collateralAssets.length > 0 ? '/' + pool.collateralAssets[0].ticker : '')) : p.poolId.slice(0, 16) + '..';
+    const pName = poolDisplayName(pool);
     const health = healthClass(p.ltv);
     const hLabel = healthLabel(p.ltv);
+    const liqThreshold = pool?.liquidationThresholdLTV || 0.8;
+    const barPct = Math.min((p.ltv / liqThreshold) * 100, 100);
+    const barColor = ltvBarColor(p.ltv);
 
     html += `
       <div class="surf-position-card ${health}">
         <div class="surf-pos-header">
           <div class="surf-pos-pool">
-            <span class="surf-pos-pool-name">${escHtml(poolName)}</span>
+            <span class="surf-pos-pool-name">${escHtml(pName)}</span>
             <span class="surf-pos-address">${escHtml(shorten(p.address, 8))}</span>
           </div>
           <div class="surf-pos-health">
             <span class="surf-health-badge ${health}">${escHtml(hLabel)}</span>
             <span class="surf-ltv">LTV: ${fmtPct(p.ltv)}</span>
           </div>
+        </div>
+        <div class="surf-ltv-bar-wrap">
+          <div class="surf-ltv-bar-bg">
+            <div class="surf-ltv-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
+          </div>
+          <span class="surf-ltv-bar-label">${barPct.toFixed(0)}% toward liquidation (threshold: ${fmtPct(liqThreshold)})</span>
         </div>
         <div class="surf-pos-body">
           <div class="surf-pos-detail">
@@ -1490,6 +1579,11 @@ $('#surfPoolFilter')?.addEventListener('change', (e) => {
 
 $('#surfStatusFilter')?.addEventListener('change', (e) => {
   surfFilterStatus = e.target.value;
+  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
+});
+
+$('#surfSortBy')?.addEventListener('change', (e) => {
+  surfSortBy = e.target.value;
   if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
 });
 

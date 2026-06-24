@@ -68,6 +68,11 @@ export default async function handler(req, res) {
         totalUnpaidInterest: info.totalUnpaidInterest || 0,
         u: info.u || 0,
         cToken: { policyId: ctoken.policyId || '', assetName: ctoken.assetName || '' },
+        maxBorrowLTV: info.maxBorrowLTV || 0,
+        recommendedBorrowLTV: info.recommendedBorrowLTV || 0,
+        liquidationThresholdLTV: info.liquidationThresholdLTV || 0,
+        historicalApy: info.historicalApy || 0,
+        totalVolume: info.totalVolume || 0,
       };
     });
 
