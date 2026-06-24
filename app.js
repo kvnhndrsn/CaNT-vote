@@ -1702,8 +1702,8 @@ function renderSurfSummary(summary) {
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Total TVL</span>
-        <span class="surf-stat-value">${fmtADA(toADA(summary.totalSuppliedUSD))}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.totalSuppliedUSD)}</span>
+        <span class="surf-stat-value">${fmtADA(toADA(summary.totalCollateralUSD + summary.totalBorrowedUSD))}</span>
+        <span class="surf-stat-usd">${fmtUSD(summary.totalCollateralUSD + summary.totalBorrowedUSD)}</span>
       </div>
     </div>
   `;
