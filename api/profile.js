@@ -18,10 +18,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing address query param' });
     }
 
-    // Get all votes by this address
+    // Get all votes by this address (without split_weights — handled later)
     const { data: votes, error: votesErr } = await supabase
       .from('votes')
-      .select('proposal_id, vote_choice, stake_weight, split_weights, created_at')
+      .select('proposal_id, vote_choice, stake_weight, created_at')
       .eq('voter_address', address)
       .order('created_at', { ascending: false });
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const propIds = [...new Set(votes.map(v => v.proposal_id))];
     const { data: proposals, error: propErr } = await supabase
       .from('proposals')
-      .select('id, title, category, options, created_at')
+      .select('id, title, created_at')
       .in('id', propIds.length > 0 ? propIds : ['00000000-0000-0000-0000-000000000000']);
 
     if (propErr) throw propErr;
@@ -46,16 +46,22 @@ export default async function handler(req, res) {
       proposal: propMap[v.proposal_id] || null,
     }));
 
-    // Get comment count
-    const { count: commentCount } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('voter_address', address);
+    // Get comment count (gracefully if comments table doesn't exist)
+    let commentCount = 0;
+    try {
+      const { count } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('voter_address', address);
+      commentCount = count || 0;
+    } catch {
+      // comments table not migrated yet
+    }
 
     // Get proposals created by this address
     const { data: createdPolls, error: createdErr } = await supabase
       .from('proposals')
-      .select('id, title, category, created_at')
+      .select('id, title, created_at')
       .eq('creator_address', address)
       .order('created_at', { ascending: false });
 
@@ -64,7 +70,7 @@ export default async function handler(req, res) {
     return res.json({
       address,
       totalVotes: votes.length,
-      totalComments: commentCount || 0,
+      totalComments: commentCount,
       totalCreated: (createdPolls || []).length,
       votes: enrichedVotes,
       created: createdPolls || [],

@@ -16,18 +16,17 @@ CREATE TABLE IF NOT EXISTS comments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS delegations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    delegator VARCHAR(255) NOT NULL,
-    delegate VARCHAR(255) NOT NULL,
-    poll_id UUID REFERENCES proposals(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(delegator, COALESCE(poll_id, '00000000-0000-0000-0000-000000000000'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_comments_proposal ON comments(proposal_id);
-CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON delegations(delegator);
-CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON delegations(delegate);
+-- Delegations table (uncomment when delegation feature is wired)
+-- CREATE TABLE IF NOT EXISTS delegations (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     delegator VARCHAR(255) NOT NULL,
+--     delegate VARCHAR(255) NOT NULL,
+--     poll_id UUID REFERENCES proposals(id) ON DELETE CASCADE,
+--     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- );
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_delegations_unique ON delegations(delegator, COALESCE(poll_id, '00000000-0000-0000-0000-000000000000'));
+-- CREATE INDEX IF NOT EXISTS idx_delegations_delegator ON delegations(delegator);
+-- CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON delegations(delegate);
 
 ALTER TABLE votes ADD COLUMN IF NOT EXISTS split_weights JSONB;
 ALTER TABLE votes ADD COLUMN IF NOT EXISTS delegate_to VARCHAR(255);
