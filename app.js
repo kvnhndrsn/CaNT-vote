@@ -1601,20 +1601,29 @@ $$('.tab').forEach(tab => {
 
 /* ---------- Surf Lending Dashboard ---------- */
 
-const SURF_COLORS = {
-  healthy: '#22c55e',
-  warning: '#f59e0b',
-  danger: '#ef4444',
-};
-
 let surfData = null;
 let surfFilterAddr = '';
 let surfFilterPool = '';
 let surfFilterStatus = '';
-let surfSortBy = 'ltv-desc';
 let surfRefreshInterval = null;
 let surfTickInterval = null;
 let surfLastUpdated = null;
+let surfSortKey = 'ltv';
+let surfSortDir = -1;
+
+const SURF_COLUMNS = [
+  { key: 'health',    label: '',        sortable: true,  align: 'center', width: 32 },
+  { key: 'pool',      label: 'Pool',    sortable: true,  align: 'left' },
+  { key: 'address',   label: 'Address', sortable: true,  align: 'left' },
+  { key: 'ltv',       label: 'LTV',     sortable: true,  align: 'right' },
+  { key: 'collateral',label: 'Collateral', sortable: true, align: 'right' },
+  { key: 'borrow',    label: 'Borrowed', sortable: true,  align: 'right' },
+  { key: 'netvalue',  label: 'Net Value',sortable: true,  align: 'right' },
+  { key: 'apr',       label: 'APR',     sortable: true,  align: 'right' },
+  { key: 'duration',  label: 'Duration',sortable: true,  align: 'right' },
+  { key: 'interest',  label: 'Interest',sortable: true,  align: 'right' },
+  { key: 'opened',    label: 'Opened',  sortable: true,  align: 'left' },
+];
 
 async function fetchSurfDashboard() {
   const container = $('#surfContent');
@@ -1648,7 +1657,6 @@ function updateSurfUpdated() {
 function renderSurfDashboard() {
   if (!surfData) return;
   const { pools, positions, summary } = surfData;
-
   renderSurfSummary(summary);
   renderSurfPoolFilter(pools);
   renderSurfPositions(positions, pools, summary);
@@ -1708,6 +1716,16 @@ function renderSurfPoolFilter(pools) {
   sel.value = current;
 }
 
+function surfSortByColumn(key) {
+  if (surfSortKey === key) {
+    surfSortDir *= -1;
+  } else {
+    surfSortKey = key;
+    surfSortDir = -1;
+  }
+  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
+}
+
 function renderSurfPositions(positions, pools, summary) {
   const container = $('#surfContent');
 
@@ -1731,24 +1749,21 @@ function renderSurfPositions(positions, pools, summary) {
   }
 
   const sortFns = {
-    'ltv-desc': (a, b) => (b.ltv || 0) - (a.ltv || 0),
-    'ltv-asc': (a, b) => (a.ltv || 0) - (b.ltv || 0),
-    'value-desc': (a, b) => (b.netValueUSD || 0) - (a.netValueUSD || 0),
-    'value-asc': (a, b) => (a.netValueUSD || 0) - (b.netValueUSD || 0),
-    'owed-desc': (a, b) => (b.totalOwedUSD || 0) - (a.totalOwedUSD || 0),
-    'collateral-desc': (a, b) => (b.collateralValueUSD || 0) - (a.collateralValueUSD || 0),
-    'duration-desc': (a, b) => (b.elapsedYears || 0) - (a.elapsedYears || 0),
-    'duration-asc': (a, b) => (a.elapsedYears || 0) - (b.elapsedYears || 0),
-    'apr-desc': (a, b) => (b.interestRate || 0) - (a.interestRate || 0),
-    'health': (a, b) => {
-      const hA = a.ltv >= 0.75 ? 2 : a.ltv >= 0.5 ? 1 : 0;
-      const hB = b.ltv >= 0.75 ? 2 : b.ltv >= 0.5 ? 1 : 0;
-      return hB - hA;
-    },
+    'health':    (a, b) => (a.ltv >= 0.75 ? 2 : a.ltv >= 0.5 ? 1 : 0) - (b.ltv >= 0.75 ? 2 : b.ltv >= 0.5 ? 1 : 0),
+    'pool':      (a, b) => (a.principalTicker || '').localeCompare(b.principalTicker || ''),
+    'address':   (a, b) => (a.address || '').localeCompare(b.address || ''),
+    'ltv':       (a, b) => (a.ltv || 0) - (b.ltv || 0),
+    'collateral':(a, b) => (a.collateralValueUSD || 0) - (b.collateralValueUSD || 0),
+    'borrow':    (a, b) => (a.totalOwedUSD || 0) - (b.totalOwedUSD || 0),
+    'netvalue':  (a, b) => (a.netValueUSD || 0) - (b.netValueUSD || 0),
+    'apr':       (a, b) => (a.interestRate || 0) - (b.interestRate || 0),
+    'duration':  (a, b) => (a.elapsedYears || 0) - (b.elapsedYears || 0),
+    'interest':  (a, b) => (a.accruedInterest || 0) - (b.accruedInterest || 0),
+    'opened':    (a, b) => (a.startTime || 0) - (b.startTime || 0),
   };
 
-  if (sortFns[surfSortBy]) {
-    filtered.sort(sortFns[surfSortBy]);
+  if (sortFns[surfSortKey]) {
+    filtered.sort((a, b) => sortFns[surfSortKey](a, b) * surfSortDir);
   }
 
   if (filtered.length === 0) {
@@ -1760,27 +1775,22 @@ function renderSurfPositions(positions, pools, summary) {
   const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtPct = (v) => (v * 100).toFixed(2) + '%';
   const fmtDate = (ts) => {
-    if (!ts) return 'Unknown';
+    if (!ts) return '—';
     const d = new Date(ts);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+    return d.toLocaleDateString();
   };
   const fmtTime = (years) => {
+    if (!years) return '—';
     if (years < 0.00274) return Math.floor(years * 8766) + 'h';
     if (years < 0.0833) return Math.floor(years * 30.44) + 'd';
     if (years < 1) return Math.floor(years * 12) + 'mo';
     return years.toFixed(1) + 'y';
   };
 
-  function healthClass(ltv) {
-    if (ltv >= 0.75) return 'surf-health-danger';
-    if (ltv >= 0.5) return 'surf-health-warning';
-    return 'surf-health-ok';
-  }
-
-  function healthLabel(ltv) {
-    if (ltv >= 0.75) return 'Liquidatable';
-    if (ltv >= 0.5) return 'At Risk';
-    return 'Healthy';
+  function healthDot(ltv) {
+    if (ltv >= 0.75) return '<span class="surf-dot surf-dot-danger" title="Liquidatable"></span>';
+    if (ltv >= 0.5) return '<span class="surf-dot surf-dot-warning" title="At Risk"></span>';
+    return '<span class="surf-dot surf-dot-ok" title="Healthy"></span>';
   }
 
   function poolDisplayName(pool) {
@@ -1789,13 +1799,28 @@ function renderSurfPositions(positions, pools, summary) {
     const collaterals = pool.collateralAssets.map(c => c.ticker).filter(Boolean);
     if (collaterals.length === 0) return borrowed;
     if (collaterals.length === 1) return borrowed + '/' + collaterals[0];
-    return borrowed + '/' + collaterals.slice(0, 2).join('+') + (collaterals.length > 2 ? '...' : '');
+    return borrowed + '/' + collaterals.slice(0, 2).join('+') + (collaterals.length > 2 ? '…' : '');
   }
 
-  function ltvBarColor(pct) {
-    if (pct >= 0.75) return '#ef4444';
-    if (pct >= 0.5) return '#f59e0b';
-    return '#22c55e';
+  function cellVal(p) {
+    const pool = pools ? pools.find(po => po.poolId === p.poolId) : null;
+    const pName = poolDisplayName(pool);
+    const liqThreshold = pool?.liquidationThresholdLTV || 0.8;
+    const ltvPct = p.ltv / liqThreshold;
+
+    return {
+      health:     healthDot(p.ltv),
+      pool:       escHtml(pName),
+      address:    escHtml(shorten(p.address, 6)) + '<span class="surf-cell-sub">' + escHtml(shorten(p.address, 20)) + '</span>',
+      ltv:        `<span class="surf-ltv-cell ${p.ltv >= 0.75 ? 'surf-txt-danger' : p.ltv >= 0.5 ? 'surf-txt-warning' : 'surf-txt-ok'}">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
+      collateral: fmtADA(p.collateral, p.collateralDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.collateralTicker) + '</span><span class="surf-cell-sub">' + fmtUSD(p.collateralValueUSD) + '</span>',
+      borrow:     fmtADA(p.totalOwed, p.principalDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.principalTicker) + '</span><span class="surf-cell-sub">' + fmtUSD(p.totalOwedUSD) + '</span>',
+      netvalue:   `<span class="${p.netValueUSD < 0 ? 'surf-txt-danger' : 'surf-txt-ok'}">${fmtUSD(p.netValueUSD)}</span>`,
+      apr:        fmtPct(p.interestRate),
+      duration:   fmtTime(p.elapsedYears),
+      interest:   fmtADA(p.accruedInterest, p.principalDecimals) + ' <span class="surf-cell-sub">' + escHtml(p.principalTicker) + '</span>',
+      opened:     fmtDate(p.startTime),
+    };
   }
 
   const atRisk = filtered.filter(p => p.ltv >= 0.5).length;
@@ -1808,76 +1833,38 @@ function renderSurfPositions(positions, pools, summary) {
   html += `<span class="surf-stats-mini">`;
   html += `<span class="surf-mini-stat">At Risk: <strong>${atRisk}</strong></span>`;
   html += `<span class="surf-mini-stat">Avg APR: <strong>${fmtPct(weightedApr)}</strong></span>`;
-  html += `<span class="surf-mini-stat">Ratio: <strong>${(totalCollateralUSD / (totalBorrowUSD || 1)).toFixed(2)}x</strong></span>`;
-  html += `</span>`;
-  html += `</div>`;
+  html += `<span class="surf-mini-stat">Collateral Ratio: <strong>${(totalCollateralUSD / (totalBorrowUSD || 1)).toFixed(2)}x</strong></span>`;
+  html += `</span></div>`;
 
-  html += '<div class="surf-position-list">';
+  html += '<div class="surf-table-wrap"><table class="surf-table"><thead><tr>';
+  for (const col of SURF_COLUMNS) {
+    let attrs = `class="surf-th surf-th-${col.align}"`;
+    if (col.width) attrs += ` style="width:${col.width}px"`;
+    if (col.sortable) {
+      const arrow = surfSortKey === col.key ? (surfSortDir === -1 ? ' ▼' : ' ▲') : '';
+      html += `<th ${attrs} data-sort="${col.key}">${escHtml(col.label)}${arrow}</th>`;
+    } else {
+      html += `<th ${attrs}>${escHtml(col.label)}</th>`;
+    }
+  }
+  html += '</tr></thead><tbody>';
 
   for (const p of filtered) {
-    const pool = pools ? pools.find(po => po.poolId === p.poolId) : null;
-    const pName = poolDisplayName(pool);
-    const health = healthClass(p.ltv);
-    const hLabel = healthLabel(p.ltv);
-    const liqThreshold = pool?.liquidationThresholdLTV || 0.8;
-    const barPct = Math.min((p.ltv / liqThreshold) * 100, 100);
-    const barColor = ltvBarColor(p.ltv);
-
-    html += `
-      <div class="surf-position-card ${health}">
-        <div class="surf-pos-header">
-          <div class="surf-pos-pool">
-            <span class="surf-pos-pool-name">${escHtml(pName)}</span>
-            <span class="surf-pos-address">${escHtml(shorten(p.address, 8))}</span>
-          </div>
-          <div class="surf-pos-health">
-            <span class="surf-health-badge ${health}">${escHtml(hLabel)}</span>
-            <span class="surf-ltv">LTV: ${fmtPct(p.ltv)}</span>
-          </div>
-        </div>
-        <div class="surf-ltv-bar-wrap">
-          <div class="surf-ltv-bar-bg">
-            <div class="surf-ltv-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
-          </div>
-          <span class="surf-ltv-bar-label">${barPct.toFixed(0)}% toward liquidation (threshold: ${fmtPct(liqThreshold)})</span>
-        </div>
-        <div class="surf-pos-body">
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">Collateral</span>
-            <span class="surf-detail-value">${fmtADA(p.collateral, p.collateralDecimals)} ${escHtml(p.collateralTicker)}</span>
-            <span class="surf-detail-usd">${fmtUSD(p.collateralValueUSD)}</span>
-          </div>
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">Borrow</span>
-            <span class="surf-detail-value">${fmtADA(p.totalOwed, p.principalDecimals)} ${escHtml(p.principalTicker)}</span>
-            <span class="surf-detail-usd">${fmtUSD(p.totalOwedUSD)}</span>
-          </div>
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">Net Value</span>
-            <span class="surf-detail-value ${p.netValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(p.netValueUSD)}</span>
-          </div>
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">APR</span>
-            <span class="surf-detail-value">${fmtPct(p.interestRate)}</span>
-          </div>
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">Duration</span>
-            <span class="surf-detail-value">${fmtTime(p.elapsedYears)}</span>
-          </div>
-          <div class="surf-pos-detail">
-            <span class="surf-detail-label">Interest Accrued</span>
-            <span class="surf-detail-value">${fmtADA(p.accruedInterest, p.principalDecimals)} ${escHtml(p.principalTicker)}</span>
-          </div>
-        </div>
-        <div class="surf-pos-footer">
-          <span class="surf-footer-meta">Opened: ${fmtDate(p.startTime)}</span>
-          <span class="surf-footer-meta">ID: ${escHtml(shorten(p.borrowId?.txHash || p.outRef?.txHash || '', 10))}</span>
-        </div>
-      </div>`;
+    const vals = cellVal(p);
+    const rowClass = p.ltv >= 0.75 ? 'surf-row-danger' : p.ltv >= 0.5 ? 'surf-row-warning' : '';
+    html += `<tr class="${rowClass}">`;
+    for (const col of SURF_COLUMNS) {
+      html += `<td class="surf-td surf-td-${col.align}">${vals[col.key] || ''}</td>`;
+    }
+    html += `</tr>`;
   }
 
-  html += '</div>';
+  html += '</tbody></table></div>';
   container.innerHTML = html;
+
+  container.querySelectorAll('.surf-th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => surfSortByColumn(th.dataset.sort));
+  });
 }
 
 $('#surfAddressFilter')?.addEventListener('input', (e) => {
@@ -1892,11 +1879,6 @@ $('#surfPoolFilter')?.addEventListener('change', (e) => {
 
 $('#surfStatusFilter')?.addEventListener('change', (e) => {
   surfFilterStatus = e.target.value;
-  if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
-});
-
-$('#surfSortBy')?.addEventListener('change', (e) => {
-  surfSortBy = e.target.value;
   if (surfData) renderSurfPositions(surfData.positions, surfData.pools, surfData.summary);
 });
 

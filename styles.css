@@ -553,6 +553,14 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 .surf-stat-usd.surf-pos { color: var(--success); }
 .surf-stat-usd.surf-neg { color: var(--danger); }
 
+.badge-surf {
+  background: linear-gradient(135deg, #d94f6f, #f59e0b);
+  color: #fff;
+  font-size: 0.55rem;
+  padding: 0.05rem 0.35rem;
+  vertical-align: middle;
+}
+
 .surf-filters {
   display: flex;
   gap: 0.4rem;
@@ -583,150 +591,6 @@ select.surf-input {
   cursor: pointer;
 }
 
-.surf-position-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.surf-position-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.55rem 0.75rem;
-  transition: border-color 0.15s;
-  border-left: 3px solid transparent;
-}
-
-.surf-position-card.surf-health-ok { border-left-color: var(--success); }
-.surf-position-card.surf-health-warning { border-left-color: var(--warning, #f59e0b); }
-.surf-position-card.surf-health-danger { border-left-color: var(--danger); }
-
-.surf-pos-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.surf-pos-pool {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-.surf-pos-pool-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
-.surf-pos-address {
-  font-size: 0.65rem;
-  color: var(--text3);
-  padding: 0.05rem 0.3rem;
-  background: var(--surface2);
-  border-radius: 4px;
-}
-
-.surf-pos-health {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
-}
-
-.surf-health-badge {
-  font-size: 0.6rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.surf-health-badge.surf-health-ok {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--success);
-}
-
-.surf-health-badge.surf-health-warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--warning, #f59e0b);
-}
-
-.surf-health-badge.surf-health-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--danger);
-}
-
-.surf-ltv {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text2);
-  font-variant-numeric: tabular-nums;
-}
-
-.surf-pos-body {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.3rem;
-}
-
-.surf-pos-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-}
-
-.surf-detail-label {
-  font-size: 0.6rem;
-  font-weight: 600;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.surf-detail-value {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.surf-detail-value.surf-pos { color: var(--success); }
-.surf-detail-value.surf-neg { color: var(--danger); }
-
-.surf-detail-usd {
-  font-size: 0.65rem;
-  color: var(--text3);
-  font-variant-numeric: tabular-nums;
-}
-
-.surf-pos-footer {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.3rem;
-  padding-top: 0.3rem;
-  border-top: 1px solid var(--border);
-}
-
-.surf-footer-meta {
-  font-size: 0.6rem;
-  color: var(--text3);
-}
-
-.badge-surf {
-  background: linear-gradient(135deg, #d94f6f, #f59e0b);
-  color: #fff;
-  font-size: 0.55rem;
-  padding: 0.05rem 0.35rem;
-  vertical-align: middle;
-}
-
-/* Surf sorting + updated */
 .surf-updated {
   font-size: 0.6rem;
   color: var(--text3);
@@ -762,42 +626,137 @@ select.surf-input {
   font-weight: 600;
 }
 
-/* Surf LTV progress bar */
-.surf-ltv-bar-wrap {
-  margin: 0.35rem 0 0.25rem;
+/* ---------- Surf Table ---------- */
+
+.surf-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-.surf-ltv-bar-bg {
-  position: relative;
-  height: 6px;
-  background: var(--surface2);
-  border-radius: 3px;
-  overflow: visible;
-}
-
-.surf-ltv-bar-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-  min-width: 2px;
-}
-
-.surf-ltv-bar-label {
-  display: block;
-  font-size: 0.55rem;
-  color: var(--text3);
-  margin-top: 0.15rem;
+.surf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
+  min-width: 900px;
+}
+
+.surf-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.surf-th {
+  padding: 0.35rem 0.5rem;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.surf-th[data-sort] {
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.surf-th[data-sort]:hover {
+  color: var(--primary);
+}
+
+.surf-th-left { text-align: left; }
+.surf-th-right { text-align: right; }
+.surf-th-center { text-align: center; }
+
+.surf-td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.surf-td-left { text-align: left; }
+.surf-td-right { text-align: right; }
+.surf-td-center { text-align: center; }
+
+.surf-table tbody tr {
+  background: var(--surface);
+  transition: background 0.1s;
+}
+
+.surf-table tbody tr:nth-child(even) {
+  background: var(--grey-900);
+}
+
+.surf-table tbody tr:hover {
+  background: var(--primary-dim);
+}
+
+.surf-row-warning {
+  border-left: 3px solid #f59e0b;
+}
+
+.surf-row-danger {
+  border-left: 3px solid var(--danger);
+}
+
+/* Health dot */
+.surf-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.surf-dot-ok { background: var(--success); }
+.surf-dot-warning { background: #f59e0b; }
+.surf-dot-danger { background: var(--danger); }
+
+/* Cell sub text */
+.surf-cell-sub {
+  display: block;
+  font-size: 0.6rem;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Text color helpers */
+.surf-txt-ok { color: var(--success); }
+.surf-txt-warning { color: #f59e0b; }
+.surf-txt-danger { color: var(--danger); }
+
+/* LTV cell with mini bar */
+.surf-ltv-cell {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.surf-ltv-bar {
+  display: block;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  margin-top: 2px;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.surf-ltv-bar .surf-ltv-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transition: width 0.3s ease;
 }
 
 @media (max-width: 640px) {
   .surf-summary-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .surf-pos-body {
     grid-template-columns: repeat(2, 1fr);
   }
   .surf-filters {
