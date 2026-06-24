@@ -2068,9 +2068,9 @@ async function renderAnalytics() {
         }],
       },
       options: {
-        responsive: true, maintainAspectRatio: true,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'right', labels: { color: C.text, font: { size: 11 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } },
+          legend: { position: 'bottom', labels: { color: C.text, font: { size: 10 }, padding: 8, usePointStyle: true, pointStyle: 'circle', boxWidth: 10 } },
           tooltip: {
             backgroundColor: C.surface, titleColor: C.text, bodyColor: C.text,
             borderColor: C.grid, borderWidth: 1, cornerRadius: 6, padding: 8,
