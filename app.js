@@ -1351,19 +1351,25 @@ function renderSurfDashboard() {
 function renderSurfSummary(summary) {
   const el = $('#surfSummary');
   const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const adaPrice = summary.adaPrice || 1;
+  const toADA = (usd) => usd / adaPrice;
   el.innerHTML = `
     <div class="surf-summary-grid">
       <div class="surf-stat">
         <span class="surf-stat-label">Total Borrowed</span>
         <span class="surf-stat-value">${fmtUSD(summary.totalBorrowedUSD)}</span>
+        <span class="surf-stat-ada">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Total Collateral</span>
         <span class="surf-stat-value">${fmtUSD(summary.totalCollateralUSD)}</span>
+        <span class="surf-stat-ada">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Net Position Value</span>
         <span class="surf-stat-value ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(summary.totalNetValueUSD)}</span>
+        <span class="surf-stat-ada ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">Open Positions</span>
@@ -1372,6 +1378,7 @@ function renderSurfSummary(summary) {
       <div class="surf-stat">
         <span class="surf-stat-label">SURF Price</span>
         <span class="surf-stat-value">${fmtUSD(summary.surfPrice)}</span>
+        <span class="surf-stat-ada">${fmtADA(toADA(summary.surfPrice))}</span>
       </div>
       <div class="surf-stat">
         <span class="surf-stat-label">ADA Price</span>

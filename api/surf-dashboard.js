@@ -154,7 +154,7 @@ export default async function handler(req, res) {
           collateralAssetName: pos.collateralAsset?.assetName || '',
           interestRate,
           startTime: pos.startTime,
-          ltv: pos.ltv || 0,
+          ltv: collateralValueUSD > 0 ? totalOwedUSD / collateralValueUSD : 0,
           borrowId: pos.borrowId || null,
           outRef: pos.outRef || null,
           elapsedYears,
