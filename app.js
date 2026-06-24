@@ -1972,15 +1972,15 @@ async function renderAnalytics() {
 
     // 2 — Position Health
     mkChart(document.querySelector('#chartHealth canvas'), {
-      type: 'bar',
+      type: 'line',
       data: sci([
-        { label: 'Healthy', data: snap.map(s => s.positions_healthy), backgroundColor: C.green + '99', borderRadius: 2 },
-        { label: 'At Risk', data: snap.map(s => s.positions_at_risk), backgroundColor: C.amber + '99', borderRadius: 2 },
-        { label: 'Liquidatable', data: snap.map(s => s.positions_liquidatable), backgroundColor: C.red + '99', borderRadius: 2 },
+        { label: 'Healthy', data: snap.map(s => s.positions_healthy), borderColor: C.green, backgroundColor: C.green + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'At Risk', data: snap.map(s => s.positions_at_risk), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Liquidatable', data: snap.map(s => s.positions_liquidatable), borderColor: C.red, backgroundColor: C.red + '18', fill: true, tension: 0.3, pointRadius: 0 },
       ]),
       options: {
         ...base(),
-        scales: { x: xAxis(), y: { ...yAxis(numTick), stacked: true, beginAtZero: true } },
+        scales: { x: xAxis(), y: yAxis(numTick) },
         plugins: { legend: { ...lo(C.text), position: 'bottom' } },
       },
     });
