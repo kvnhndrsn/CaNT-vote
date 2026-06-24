@@ -1969,23 +1969,24 @@ async function renderAnalytics() {
       type: 'line',
       data: sci([
         { label: 'Total Supplied', data: snap.map(s => toUnit(s.total_supplied_usd, s.ada_price)), borderColor: C.accent, backgroundColor: C.accent + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Total Borrowed', data: snap.map(s => toUnit(s.total_borrowed_usd, s.ada_price)), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Net Value', data: snap.map(s => toUnit(s.total_net_value_usd, s.ada_price)), borderColor: C.green, borderDash: [3, 3], tension: 0.3, pointRadius: 0 },
+        { label: 'Total Borrowed', data: snap.map(s => toUnit(s.total_borrowed_usd, s.ada_price)), borderColor: C.amber, tension: 0.3, pointRadius: 0 },
+        { label: 'Total Collateral', data: snap.map(s => toUnit(s.total_collateral_usd, s.ada_price)), borderColor: C.blue, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
+        { label: 'TVL', data: snap.map(s => toUnit((s.total_collateral_usd || 0) + (s.total_borrowed_usd || 0), s.ada_price)), borderColor: C.green, tension: 0.3, pointRadius: 0 },
       ]),
       options: { ...base(), scales: { x: xAxis(), y: yAxis(moneyTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
     });
 
-    // 2 — Position Health
+    // 2 — Position Health (USD value)
     mkChart(document.querySelector('#chartHealth canvas'), {
       type: 'line',
       data: sci([
-        { label: 'Healthy', data: snap.map(s => s.positions_healthy), borderColor: C.green, backgroundColor: C.green + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'At Risk', data: snap.map(s => s.positions_at_risk), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Liquidatable', data: snap.map(s => s.positions_liquidatable), borderColor: C.red, backgroundColor: C.red + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Healthy', data: snap.map(s => toUnit(s.healthy_value_usd || 0, s.ada_price)), borderColor: C.green, backgroundColor: C.green + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'At Risk', data: snap.map(s => toUnit(s.at_risk_value_usd || 0, s.ada_price)), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Liquidatable', data: snap.map(s => toUnit(s.liquidatable_value_usd || 0, s.ada_price)), borderColor: C.red, backgroundColor: C.red + '18', fill: true, tension: 0.3, pointRadius: 0 },
       ]),
       options: {
         ...base(),
-        scales: { x: xAxis(), y: yAxis(numTick) },
+        scales: { x: xAxis(), y: yAxis(moneyTick) },
         plugins: { legend: { ...lo(C.text), position: 'bottom' } },
       },
     });

@@ -150,6 +150,7 @@ export default async function handler(req, res) {
 
     const buckets = { '0-25': 0, '25-50': 0, '50-75': 0, '75-100': 0 };
     let healthy = 0, atRisk = 0, liquidatable = 0;
+    let healthyValue = 0, atRiskValue = 0, liquidatableValue = 0;
     let totalLtv = 0, totalApr = 0, totalSuppliedUSD = 0, totalBorrowedUSD = 0;
     let totalCollateralUSD = 0, totalNetValueUSD = 0, totalReserveUSD = 0;
     let totalUnpaidInterestUSD = 0;
@@ -159,9 +160,9 @@ export default async function handler(req, res) {
       const ltv = p.ltv || 0;
       const bucket = ltvBucket(ltv);
       buckets[bucket] = (buckets[bucket] || 0) + 1;
-      if (ltv >= 0.75) liquidatable++;
-      else if (ltv >= 0.5) atRisk++;
-      else healthy++;
+      if (ltv >= 0.75) { liquidatable++; liquidatableValue += p.collateralValueUSD + p.totalOwedUSD; }
+      else if (ltv >= 0.5) { atRisk++; atRiskValue += p.collateralValueUSD + p.totalOwedUSD; }
+      else { healthy++; healthyValue += p.collateralValueUSD + p.totalOwedUSD; }
       totalLtv += ltv;
       totalApr += (p.interestRate || 0) * p.totalOwedUSD;
       totalBorrowedUSD += p.totalOwedUSD;
@@ -214,6 +215,9 @@ export default async function handler(req, res) {
         positions_healthy: healthy,
         positions_at_risk: atRisk,
         positions_liquidatable: liquidatable,
+        healthy_value_usd: healthyValue,
+        at_risk_value_usd: atRiskValue,
+        liquidatable_value_usd: liquidatableValue,
         total_supplied_usd: totalSuppliedUSD,
         total_borrowed_usd: totalBorrowedUSD,
         total_collateral_usd: totalCollateralUSD,

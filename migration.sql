@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS surf_protocol_snapshots (
     positions_healthy INT NOT NULL DEFAULT 0,
     positions_at_risk INT NOT NULL DEFAULT 0,
     positions_liquidatable INT NOT NULL DEFAULT 0,
+    healthy_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    at_risk_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+    liquidatable_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
     total_supplied_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
     total_borrowed_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
     total_collateral_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -58,6 +61,11 @@ CREATE TABLE IF NOT EXISTS surf_protocol_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_surf_protocol_snapshots_time ON surf_protocol_snapshots(snapshot_at);
+
+-- Add health value columns (if table already exists from previous migration)
+ALTER TABLE surf_protocol_snapshots ADD COLUMN IF NOT EXISTS healthy_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE surf_protocol_snapshots ADD COLUMN IF NOT EXISTS at_risk_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE surf_protocol_snapshots ADD COLUMN IF NOT EXISTS liquidatable_value_usd DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 -- SURF pool snapshots (per-pool time-series data)
 CREATE TABLE IF NOT EXISTS surf_pool_snapshots (
