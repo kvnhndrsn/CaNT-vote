@@ -1302,13 +1302,13 @@ select.surf-input {
 }
 
 .activity-type-borrow { background: #3b82f6; color: #fff; }
-.activity-type-repay { background: #22c55e; color: #fff; }
-.activity-type-deposit { background: #8b5cf6; color: #fff; }
-.activity-type-withdraw { background: #f59e0b; color: #fff; }
-.activity-type-add-collateral { background: #06b6d4; color: #fff; }
+.activity-type-repay { background: #8b5cf6; color: #fff; }
+.activity-type-deposit { background: #3b82f6; color: #fff; }
+.activity-type-withdraw { background: #22c55e; color: #fff; }
+.activity-type-add-collateral { background: #22c55e; color: #fff; }
 .activity-type-cancel-borrow { background: #ef4444; color: #fff; }
-.activity-type-leveraged-borrow { background: #d946ef; color: #fff; }
-.activity-type-repay-with-collateral { background: #f97316; color: #fff; }
+.activity-type-leveraged-borrow { background: #3b82f6; color: #fff; }
+.activity-type-repay-with-collateral { background: #8b5cf6; color: #fff; }
 .activity-type-liquidation { background: #ef4444; color: #fff; }
 
 .activity-token-icon {

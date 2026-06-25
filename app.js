@@ -2038,10 +2038,12 @@ async function fetchActivity() {
   }
 }
 
-function tokenIconHtml(ticker) {
-  const logo = TOKEN_LOGOS[ticker];
-  if (!logo) return '';
-  return '<img class="activity-token-icon" src="' + logo + '" alt="' + ticker + '">';
+function resolveActivityAsset(assetHex, fallbackTicker) {
+  if (!assetHex) return { label: 'ADA', logo: TOKEN_LOGOS.ADA };
+  const policyId = assetHex.slice(0, 56);
+  const match = CURATED_TOKENS.find(t => t.policy === policyId);
+  if (match) return { label: match.label, logo: match.logo };
+  return { label: fallbackTicker || '?', logo: null };
 }
 
 function renderActivity(data, container, pagination) {
@@ -2060,13 +2062,15 @@ function renderActivity(data, container, pagination) {
 
   for (const a of data.data) {
     const typeClass = 'activity-type-' + a.activity_type.toLowerCase().replace(/\s+/g, '-');
-    const amountIcon = tokenIconHtml(a.asset_ticker);
-    const collatIcon = tokenIconHtml(a.collateral_ticker);
+    const amountRes = resolveActivityAsset(a.asset, a.asset_ticker);
+    const collatRes = resolveActivityAsset(a.collateral_asset, a.collateral_ticker);
+    const amountIcon = amountRes.logo ? '<img class="activity-token-icon" src="' + amountRes.logo + '" alt="' + amountRes.label + '">' : '';
+    const collatIcon = collatRes.logo ? '<img class="activity-token-icon" src="' + collatRes.logo + '" alt="' + collatRes.label + '">' : '';
     html += '<tr>';
     html += '<td><span class="activity-type-badge ' + typeClass + '">' + escHtml(a.activity_type) + '</span></td>';
     html += '<td title="' + escHtml(a.address) + '">' + escHtml(a.address_short) + '</td>';
-    html += '<td class="activity-amount">' + amountIcon + escHtml(a.amount_fmt) + ' ' + escHtml(a.asset_ticker) + '</td>';
-    html += '<td class="activity-amount">' + collatIcon + escHtml(a.collateral_fmt) + ' ' + escHtml(a.collateral_ticker) + '</td>';
+    html += '<td class="activity-amount">' + amountIcon + escHtml(a.amount_fmt) + ' ' + escHtml(amountRes.label) + '</td>';
+    html += '<td class="activity-amount">' + collatIcon + escHtml(a.collateral_fmt) + ' ' + escHtml(collatRes.label) + '</td>';
     html += '<td class="activity-time">' + escHtml(a.time_ago) + '</td>';
     html += '<td><a href="' + a.cardanoscan_link + '" target="_blank" rel="noopener" class="activity-tx-link">view</a></td>';
     html += '</tr>';
