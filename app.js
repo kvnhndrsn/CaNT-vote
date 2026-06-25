@@ -2167,15 +2167,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateWalletUI();
   fetchProposals();
   startTicker();
-  // Load SURF token icon for nav tabs
-  const surfHex = '2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80464c4f57';
-  fetchTokenIcon(surfHex).then(logo => {
-    if (logo) {
-      document.querySelectorAll('[data-tab-icon="surf"]').forEach(el => {
-        el.innerHTML = `<img src="${logo}" alt="SURF">`;
-      });
-    }
-  });
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);
