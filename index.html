@@ -53,16 +53,9 @@
     <div id="proposalList"></div>
   </div>
   <div id="portfolioView" style="display:none">
-    <div class="section-title">Portfolio</div>
     <div id="portfolioContent"></div>
   </div>
   <div id="surfView" style="display:none">
-    <div class="surf-header">
-      <div class="section-title">
-        <span>Positions</span>
-        <span class="badge badge-surf">Live</span>
-      </div>
-    </div>
     <div class="surf-filters">
       <input type="text" id="surfAddressFilter" placeholder="Filter by address..." class="surf-input">
       <select id="surfPoolFilter" class="surf-input">
@@ -81,24 +74,18 @@
     </div>
   </div>
   <div id="analyticsView" style="display:none">
-    <div class="analytics-header">
-      <div class="section-title">
-        <span>SURF Protocol Analytics</span>
-        <span class="badge badge-surf">Beta</span>
-      </div>
-      <div class="surf-summary" id="analyticsSurfSummary"></div>
-      <div class="staking-stats" id="stakingStats"></div>
-      <div class="analytics-ranges">
-        <button class="btn btn-sm chart-range" data-days="1">24H</button>
-        <button class="btn btn-sm chart-range active" data-days="7">7D</button>
-        <button class="btn btn-sm chart-range" data-days="30">30D</button>
-        <button class="btn btn-sm chart-range" data-days="0">All</button>
-        <span class="analytics-unit-toggle">
-          <button class="btn btn-sm unit-btn active" data-unit="usd">USD</button>
-          <button class="btn btn-sm unit-btn" data-unit="ada">ADA</button>
-        </span>
-      </div>
+    <div class="analytics-ranges">
+      <button class="btn btn-sm chart-range" data-days="1">24H</button>
+      <button class="btn btn-sm chart-range active" data-days="7">7D</button>
+      <button class="btn btn-sm chart-range" data-days="30">30D</button>
+      <button class="btn btn-sm chart-range" data-days="0">All</button>
+      <span class="analytics-unit-toggle">
+        <button class="btn btn-sm unit-btn active" data-unit="usd">USD</button>
+        <button class="btn btn-sm unit-btn" data-unit="ada">ADA</button>
+      </span>
     </div>
+    <div class="surf-summary" id="analyticsSurfSummary"></div>
+    <div class="staking-stats" id="stakingStats"></div>
     <div class="analytics-grid" id="analyticsContent">
       <div class="analytics-card" id="chartTvl">
         <div class="analytics-card-title">TVL & Borrowed</div>
@@ -132,27 +119,21 @@
     </div>
   </div>
   <div id="activityView" style="display:none">
-    <div class="activity-header">
-      <div class="section-title">
-        <span>Protocol Activity</span>
-        <span class="badge badge-surf">Live</span>
-      </div>
-      <div class="activity-filters">
-        <select id="activityTypeFilter" class="activity-filter-select">
-          <option value="">All Types</option>
-          <option value="Borrow">Borrow</option>
-          <option value="Repay">Repay</option>
-          <option value="Deposit">Deposit</option>
-          <option value="Withdraw">Withdraw</option>
-          <option value="Add Collateral">Add Collateral</option>
-          <option value="Cancel Borrow">Cancel Borrow</option>
-          <option value="Leveraged Borrow">Leveraged Borrow</option>
-          <option value="Repay With Collateral">Repay With Collateral</option>
-          <option value="Liquidate">Liquidate</option>
-        </select>
-        <input type="text" id="activityAddressFilter" placeholder="Filter by address..." class="activity-filter-input">
-        <span id="activityUpdated" class="activity-updated"></span>
-      </div>
+    <div class="activity-filters">
+      <select id="activityTypeFilter" class="activity-filter-select">
+        <option value="">All Types</option>
+        <option value="Borrow">Borrow</option>
+        <option value="Repay">Repay</option>
+        <option value="Deposit">Deposit</option>
+        <option value="Withdraw">Withdraw</option>
+        <option value="Add Collateral">Add Collateral</option>
+        <option value="Cancel Borrow">Cancel Borrow</option>
+        <option value="Leveraged Borrow">Leveraged Borrow</option>
+        <option value="Repay With Collateral">Repay With Collateral</option>
+        <option value="Liquidate">Liquidate</option>
+      </select>
+      <input type="text" id="activityAddressFilter" placeholder="Filter by address..." class="activity-filter-input">
+      <span id="activityUpdated" class="activity-updated"></span>
     </div>
     <div id="activityContent">
       <div class="empty-state"><p>Loading activity...</p></div>

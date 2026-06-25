@@ -58,6 +58,9 @@
   --primary-dim: var(--accent-bg);
 }
 
+.txt-success { color: var(--success); }
+.txt-danger { color: var(--danger); }
+
 html.transitioning,
 html.transitioning *,
 html.transitioning *::before,
@@ -263,6 +266,25 @@ header nav { display: flex; align-items: center; justify-content: space-between;
 }
 
 .wallet-btn:hover { border-color: var(--primary); background: var(--primary-dim); }
+
+.wallet-btn-unavail {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.wallet-btn-unavail:hover {
+  border-color: var(--border);
+  background: var(--surface2);
+}
+.wallet-logo-dim { opacity: 0.4; }
+.wallet-unavail-tag {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+}
 
 .wallet-logo { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
 
@@ -505,49 +527,69 @@ header nav { display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 0.75rem;
 }
 
-.surf-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-  margin-top: 0.5rem;
+.surf-summary {
+  width: 100%;
+  margin-bottom: 0.75rem;
 }
 
-.surf-stat {
+.summary-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.4rem 0.6rem;
-  text-align: center;
+  padding: 0.75rem;
 }
 
-.surf-stat-label {
-  font-size: 0.6rem;
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.summary-header img {
+  width: 22px;
+  height: 22px;
+}
+
+.summary-header h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text1);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.summary-stat {
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+}
+
+.summary-stat-label {
+  font-size: 0.62rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--text3);
+  margin-bottom: 0.15rem;
 }
 
-.surf-stat-value {
-  font-size: 0.85rem;
+.summary-stat-value {
+  font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
+  color: var(--text1);
 }
 
-.surf-stat-value.surf-pos { color: var(--success); }
-.surf-stat-value.surf-neg { color: var(--danger); }
-
-.surf-stat-usd {
-  display: block;
-  font-size: 0.6rem;
-  font-weight: 500;
+.summary-stat-sub {
+  font-size: 0.62rem;
   color: var(--text3);
-  font-variant-numeric: tabular-nums;
-  margin-top: 0.02rem;
+  margin-top: 0.05rem;
 }
-.surf-stat-usd.surf-pos { color: var(--success); }
-.surf-stat-usd.surf-neg { color: var(--danger); }
 
 .badge-surf {
   background: linear-gradient(135deg, #d94f6f, #f59e0b);
@@ -767,7 +809,7 @@ select.surf-input {
 }
 
 @media (max-width: 640px) {
-  .surf-summary-grid {
+  .summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .surf-filters {
@@ -1344,18 +1386,19 @@ select.surf-input {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  color: var(--text);
 }
 
-.activity-type-borrow { background: rgba(59, 130, 246, 0.3); color: #fff; }
-.activity-type-repay { background: rgba(139, 92, 246, 0.3); color: #fff; }
-.activity-type-deposit { background: rgba(59, 130, 246, 0.3); color: #fff; }
-.activity-type-withdraw { background: rgba(34, 197, 94, 0.3); color: #fff; }
-.activity-type-add-collateral { background: rgba(34, 197, 94, 0.3); color: #fff; }
-.activity-type-cancel-borrow { background: rgba(239, 68, 68, 0.3); color: #fff; }
-.activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.3); color: #fff; }
-.activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.3); color: #fff; }
-.activity-type-liquidation { background: rgba(239, 68, 68, 0.3); color: #fff; }
-.activity-type-liquidate { background: rgba(239, 68, 68, 0.3); color: #fff; }
+.activity-type-borrow { background: rgba(59, 130, 246, 0.35); }
+.activity-type-repay { background: rgba(139, 92, 246, 0.35); }
+.activity-type-deposit { background: rgba(59, 130, 246, 0.35); }
+.activity-type-withdraw { background: rgba(34, 197, 94, 0.35); }
+.activity-type-add-collateral { background: rgba(34, 197, 94, 0.35); }
+.activity-type-cancel-borrow { background: rgba(239, 68, 68, 0.35); }
+.activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.35); }
+.activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.35); }
+.activity-type-liquidation { background: rgba(239, 68, 68, 0.35); }
+.activity-type-liquidate { background: rgba(239, 68, 68, 0.35); }
 
 .activity-token-icon {
   width: 16px;

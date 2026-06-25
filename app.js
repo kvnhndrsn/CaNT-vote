@@ -541,25 +541,24 @@ function getAvailableWallets() {
 
 function openWalletModal() {
   const list = $('#walletList');
-  const available = getAvailableWallets();
+  const availableIds = new Set(window.cardano ? KNOWN_WALLETS.filter(w => window.cardano[w.id]).map(w => w.id) : []);
 
-  if (available.length === 0) {
-    list.innerHTML =
-      '<p class="tooltip" style="text-align:center;padding:1rem 0">No Cardano wallet detected. Install Eternl, Nami, or Lace.</p>';
-  } else {
-    list.innerHTML = available.map(w => `
-      <button class="wallet-btn" data-wallet="${w.id}">
-        <img class="wallet-logo" src="${WALLET_LOGOS[w.id] || ''}" alt="">
+  list.innerHTML = KNOWN_WALLETS.map(w => {
+    const avail = availableIds.has(w.id);
+    return `
+      <button class="wallet-btn ${avail ? '' : 'wallet-btn-unavail'}" data-wallet="${w.id}" ${avail ? '' : 'disabled'}>
+        <img class="wallet-logo ${avail ? '' : 'wallet-logo-dim'}" src="${WALLET_LOGOS[w.id] || ''}" alt="">
         ${w.name}
+        ${avail ? '' : '<span class="wallet-unavail-tag">unavailable</span>'}
       </button>
-    `).join('');
+    `;
+  }).join('');
 
-    list.querySelectorAll('.wallet-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        await connectWallet(btn.dataset.wallet);
-      });
+  list.querySelectorAll('.wallet-btn:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await connectWallet(btn.dataset.wallet);
     });
-  }
+  });
 
   $('#walletModal').classList.add('open');
 }
@@ -1634,35 +1633,41 @@ function renderSurfSummary(summary) {
   const adaPrice = summary.adaPrice || 1;
   const toADA = (usd) => usd / adaPrice;
   el.innerHTML = `
-    <div class="surf-summary-grid">
-      <div class="surf-stat">
-        <span class="surf-stat-label">Total Borrowed</span>
-        <span class="surf-stat-value">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.totalBorrowedUSD)}</span>
+    <div class="summary-card">
+      <div class="summary-header">
+        <img class="summary-header-icon" src="/img/surf.svg" alt="">
+        <h3>Protocol Summary</h3>
       </div>
-      <div class="surf-stat">
-        <span class="surf-stat-label">Total Collateral</span>
-        <span class="surf-stat-value">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.totalCollateralUSD)}</span>
-      </div>
-      <div class="surf-stat">
-        <span class="surf-stat-label">Net Position Value</span>
-        <span class="surf-stat-value ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
-        <span class="surf-stat-usd ${summary.totalNetValueUSD < 0 ? 'surf-neg' : 'surf-pos'}">${fmtUSD(summary.totalNetValueUSD)}</span>
-      </div>
-      <div class="surf-stat">
-        <span class="surf-stat-label">Open Positions</span>
-        <span class="surf-stat-value">${summary.totalPositions}</span>
-      </div>
-      <div class="surf-stat">
-        <span class="surf-stat-label">SURF Price</span>
-        <span class="surf-stat-value">${fmtADA(summary.surfPrice)}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.surfPriceUSD)}</span>
-      </div>
-      <div class="surf-stat">
-        <span class="surf-stat-label">Total TVL</span>
-        <span class="surf-stat-value">${fmtADA(toADA(summary.totalCollateralUSD + summary.totalBorrowedUSD))}</span>
-        <span class="surf-stat-usd">${fmtUSD(summary.totalCollateralUSD + summary.totalBorrowedUSD)}</span>
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <span class="summary-stat-label">Total Borrowed</span>
+          <span class="summary-stat-value">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.totalBorrowedUSD)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Total Collateral</span>
+          <span class="summary-stat-value">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.totalCollateralUSD)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Net Position Value</span>
+          <span class="summary-stat-value ${summary.totalNetValueUSD < 0 ? 'txt-danger' : 'txt-success'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
+          <span class="summary-stat-sub ${summary.totalNetValueUSD < 0 ? 'txt-danger' : 'txt-success'}">${fmtUSD(summary.totalNetValueUSD)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Open Positions</span>
+          <span class="summary-stat-value">${summary.totalPositions}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">SURF Price</span>
+          <span class="summary-stat-value">${fmtADA(summary.surfPrice)}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.surfPriceUSD)}</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat-label">Total TVL</span>
+          <span class="summary-stat-value">${fmtADA(toADA(summary.totalCollateralUSD + summary.totalBorrowedUSD))}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.totalCollateralUSD + summary.totalBorrowedUSD)}</span>
+        </div>
       </div>
     </div>
   `;
