@@ -1301,15 +1301,15 @@ select.surf-input {
   letter-spacing: 0.02em;
 }
 
-.activity-type-borrow { background: rgba(59, 130, 246, 0.5); color: #fff; }
-.activity-type-repay { background: rgba(139, 92, 246, 0.5); color: #fff; }
-.activity-type-deposit { background: rgba(59, 130, 246, 0.5); color: #fff; }
-.activity-type-withdraw { background: rgba(34, 197, 94, 0.5); color: #fff; }
-.activity-type-add-collateral { background: rgba(34, 197, 94, 0.5); color: #fff; }
-.activity-type-cancel-borrow { background: rgba(239, 68, 68, 0.5); color: #fff; }
-.activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.5); color: #fff; }
-.activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.5); color: #fff; }
-.activity-type-liquidation { background: rgba(239, 68, 68, 0.5); color: #fff; }
+.activity-type-borrow { background: rgba(59, 130, 246, 0.3); color: #fff; }
+.activity-type-repay { background: rgba(139, 92, 246, 0.3); color: #fff; }
+.activity-type-deposit { background: rgba(59, 130, 246, 0.3); color: #fff; }
+.activity-type-withdraw { background: rgba(34, 197, 94, 0.3); color: #fff; }
+.activity-type-add-collateral { background: rgba(34, 197, 94, 0.3); color: #fff; }
+.activity-type-cancel-borrow { background: rgba(239, 68, 68, 0.3); color: #fff; }
+.activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.3); color: #fff; }
+.activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.3); color: #fff; }
+.activity-type-liquidation { background: rgba(239, 68, 68, 0.3); color: #fff; }
 
 .activity-token-icon {
   width: 16px;

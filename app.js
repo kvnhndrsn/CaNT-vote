@@ -2018,6 +2018,28 @@ $$('.unit-btn').forEach(btn => {
 let activityPage = 1;
 let activityInterval = null;
 
+const tokenLogoCache = new Map();
+
+async function fetchTokenIcon(assetHex) {
+  if (!assetHex) return null;
+  if (tokenLogoCache.has(assetHex)) return tokenLogoCache.get(assetHex);
+  try {
+    const res = await fetch(`https://tokens.cardano.org/metadata/${assetHex}`);
+    if (!res.ok) {
+      tokenLogoCache.set(assetHex, null);
+      return null;
+    }
+    const data = await res.json();
+    const raw = data?.logo?.value || null;
+    const logo = raw ? `data:image/png;base64,${raw}` : null;
+    tokenLogoCache.set(assetHex, logo);
+    return logo;
+  } catch {
+    tokenLogoCache.set(assetHex, null);
+    return null;
+  }
+}
+
 async function fetchActivity() {
   const container = $('#activityContent');
   const pagination = $('#activityPagination');
@@ -2031,6 +2053,18 @@ async function fetchActivity() {
     const res = await fetch(url);
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
+    const uniqueAssets = new Set();
+    for (const a of data.data) {
+      if (a.asset) {
+        const policyId = a.asset.slice(0, 56);
+        if (!CURATED_TOKENS.find(t => t.policy === policyId)) uniqueAssets.add(a.asset);
+      }
+      if (a.collateral_asset) {
+        const policyId = a.collateral_asset.slice(0, 56);
+        if (!CURATED_TOKENS.find(t => t.policy === policyId)) uniqueAssets.add(a.collateral_asset);
+      }
+    }
+    await Promise.all([...uniqueAssets].map(fetchTokenIcon));
     renderActivity(data, container, pagination);
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><p>Error: ' + escHtml(e.message) + '</p></div>';
@@ -2043,6 +2077,8 @@ function resolveActivityAsset(assetHex, fallbackTicker) {
   const policyId = assetHex.slice(0, 56);
   const match = CURATED_TOKENS.find(t => t.policy === policyId);
   if (match) return { label: match.label, logo: match.logo };
+  const cachedLogo = tokenLogoCache.get(assetHex);
+  if (cachedLogo) return { label: fallbackTicker || '?', logo: cachedLogo };
   return { label: fallbackTicker || '?', logo: null };
 }
 
