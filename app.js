@@ -2071,14 +2071,7 @@ function renderStakingStats() {
   const info = staking.info;
   const apy = staking.apy || {};
 
-  const toADA = (v) => {
-    if (v >= 1e15) return (v / 1e15).toFixed(2) + 'P';
-    if (v >= 1e12) return (v / 1e12).toFixed(2) + 'T';
-    if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
-    if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
-    if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
-    return v.toFixed(0);
-  };
+  const fmtExact = (v) => (v / 1e6).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const nextPeriod = info.nextStakingPeriodStart
     ? new Date(info.nextStakingPeriodStart).toLocaleDateString()
@@ -2096,7 +2089,7 @@ function renderStakingStats() {
       <div class="staking-grid">
         <div class="staking-stat">
           <div class="staking-stat-label">Total Staked</div>
-          <div class="staking-stat-value">${toADA(info.totalLiveStake)} SURF</div>
+          <div class="staking-stat-value">${fmtExact(info.totalLiveStake)} SURF</div>
           <div class="staking-stat-sub">${(info.liveStakedCirculatingSupply * 100).toFixed(1)}% of circ</div>
         </div>
         <div class="staking-stat">
@@ -2111,18 +2104,17 @@ function renderStakingStats() {
         </div>
         <div class="staking-stat">
           <div class="staking-stat-label">Distributed</div>
-          <div class="staking-stat-value">${toADA(info.totalDistributedRewards)} SURF</div>
-          <div class="staking-stat-sub">${info.totalStakeLiveUniqueStakers} stakers</div>
+          <div class="staking-stat-value">${fmtExact(info.totalDistributedRewards)} ADA</div>
         </div>
       </div>
       <div class="staking-rewards-row">
         <div class="staking-reward-box">
           <span class="staking-reward-label">Current Period Rewards</span>
-          <span class="staking-reward-value">${toADA(info.totalPeriodRewards)} SURF</span>
+          <span class="staking-reward-value">${fmtExact(info.totalPeriodRewards)} ADA</span>
         </div>
         <div class="staking-reward-box">
           <span class="staking-reward-label">Next Period Rewards</span>
-          <span class="staking-reward-value">${toADA(info.totalNextPeriodRewards)} SURF</span>
+          <span class="staking-reward-value">${fmtExact(info.totalNextPeriodRewards)} ADA</span>
         </div>
         <div class="staking-reward-box">
           <span class="staking-reward-label">Last Distribution</span>
