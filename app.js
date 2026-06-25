@@ -123,7 +123,7 @@ async function fetchProposals() {
       throw new Error(body.error || `Server error (${res.status})`);
     }
     state.proposals = await res.json();
-    prefetchHandles(state.proposals.map(p => p.creator_address));
+    await prefetchHandles(state.proposals.map(p => p.creator_address));
     renderMiniCards();
     renderFilter();
     renderProposals();
@@ -930,7 +930,7 @@ async function openAuditModal(proposalId) {
 
     $('#auditInfo').textContent = `${data.votes.length} vote(s)`;
 
-    prefetchHandles(data.votes.map(v => v.voter_address));
+    await prefetchHandles(data.votes.map(v => v.voter_address));
 
     if (data.votes.length === 0) {
       $('#auditTableWrap').innerHTML = '<p class="tooltip" style="text-align:center;padding:1rem 0">No votes recorded yet.</p>';
@@ -991,7 +991,7 @@ async function fetchProfile() {
     const res = await fetch('/api/profile?address=' + encodeURIComponent(state.address));
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
-    if (state.address) prefetchHandles([state.address]);
+    if (state.address) await prefetchHandles([state.address]);
     renderProfile(data);
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><strong>Could not load profile</strong><p>' + escHtml(e.message) + '</p></div>';
@@ -1623,6 +1623,7 @@ async function renderSurfDashboard() {
     if (pos.collateralPolicyId && pos.collateralAssetName) uniqueAssets.add(pos.collateralPolicyId + pos.collateralAssetName);
   }
   await Promise.all([...uniqueAssets].map(fetchTokenIcon));
+  await prefetchHandles(positions.map(p => p.address));
   renderSurfPositions(positions, pools, summary);
 }
 
@@ -1811,9 +1812,6 @@ function renderSurfPositions(positions, pools, summary) {
   const totalBorrowUSD = filtered.reduce((s, p) => s + p.totalOwedUSD, 0);
   const totalCollateralUSD = filtered.reduce((s, p) => s + p.collateralValueUSD, 0);
   const weightedApr = filtered.reduce((s, p) => s + (p.interestRate || 0) * (p.totalOwedUSD || 0), 0) / (totalBorrowUSD || 1);
-
-  // prefetch handles for all addresses in this view
-  prefetchHandles(filtered.map(p => p.address));
 
   let html = `<div class="surf-count-bar">`;
   html += `<span class="surf-count">${filtered.length} position${filtered.length !== 1 ? 's' : ''}</span>`;
@@ -2117,7 +2115,7 @@ async function fetchActivity() {
       if (a.collateral_asset) uniqueAssets.add(a.collateral_asset);
     }
     await Promise.all([...uniqueAssets].map(fetchTokenIcon));
-    prefetchHandles(data.data.map(a => a.address));
+    await prefetchHandles(data.data.map(a => a.address));
     renderActivity(data, container, pagination);
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><p>Error: ' + escHtml(e.message) + '</p></div>';
