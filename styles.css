@@ -719,6 +719,14 @@ select.surf-input {
   margin-top: 1px;
 }
 
+.surf-token-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 0.25rem;
+}
+
 /* Text color helpers */
 .surf-txt-ok { color: var(--success); font-weight: 600; }
 .surf-txt-warning { color: #f59e0b; font-weight: 600; }

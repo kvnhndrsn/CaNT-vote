@@ -1557,7 +1557,7 @@ async function fetchSurfDashboard() {
     if (!res.ok) throw new Error((await res.json()).error);
     surfData = await res.json();
     surfLastUpdated = Date.now();
-    renderSurfDashboard();
+    await renderSurfDashboard();
     updateSurfUpdated();
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><strong>Could not load Surf data</strong><p>' + escHtml(e.message) + '</p></div>';
@@ -1577,11 +1577,24 @@ function updateSurfUpdated() {
   }
 }
 
-function renderSurfDashboard() {
+async function renderSurfDashboard() {
   if (!surfData) return;
   const { pools, positions, summary } = surfData;
   renderSurfSummary(summary);
   renderSurfPoolFilter(pools);
+  // pre-fetch token icons for all pool assets and position collaterals
+  const uniqueAssets = new Set();
+  for (const p of pools) {
+    if (p.asset.policyId && p.asset.assetName) uniqueAssets.add(p.asset.policyId + p.asset.assetName);
+    for (const c of p.collateralAssets) {
+      if (c.policyId && c.assetName) uniqueAssets.add(c.policyId + c.assetName);
+    }
+  }
+  for (const pos of positions) {
+    if (pos.principalPolicyId && pos.principalAssetName) uniqueAssets.add(pos.principalPolicyId + pos.principalAssetName);
+    if (pos.collateralPolicyId && pos.collateralAssetName) uniqueAssets.add(pos.collateralPolicyId + pos.collateralAssetName);
+  }
+  await Promise.all([...uniqueAssets].map(fetchTokenIcon));
   renderSurfPositions(positions, pools, summary);
 }
 
@@ -1710,6 +1723,8 @@ function renderSurfPositions(positions, pools, summary) {
     return years.toFixed(1) + 'y';
   };
 
+  const iconHtml = (logoSrc, alt) => logoSrc ? `<img class="surf-token-icon" src="${escHtml(logoSrc)}" alt="${escHtml(alt)}">` : '';
+
   function poolDisplayName(pool) {
     if (!pool) return '';
     const borrowed = pool.asset.ticker;
@@ -1719,19 +1734,32 @@ function renderSurfPositions(positions, pools, summary) {
     return borrowed + '/' + collaterals.slice(0, 2).join('+') + (collaterals.length > 2 ? '…' : '');
   }
 
+  function poolAssetLogo(asset) {
+    if (!asset || !asset.policyId) return TOKEN_LOGOS.ADA;
+    return tokenLogoCache.get(asset.policyId + (asset.assetName || '')) || null;
+  }
+
+  function posAssetLogo(policyId, assetName) {
+    if (!policyId) return TOKEN_LOGOS.ADA;
+    return tokenLogoCache.get(policyId + (assetName || '')) || null;
+  }
+
   function cellVal(p) {
     const pool = pools ? pools.find(po => po.poolId === p.poolId) : null;
     const pName = poolDisplayName(pool);
     const liqThreshold = pool?.liquidationThresholdLTV || 0.8;
     const ltvPct = p.ltv / liqThreshold;
     const ltvColor = p.ltv >= 0.75 ? 'surf-txt-danger' : p.ltv >= 0.5 ? 'surf-txt-warning' : 'surf-txt-ok';
+    const poolLogo = pool ? poolAssetLogo(pool.asset) : null;
+    const borrowLogo = posAssetLogo(p.principalPolicyId, p.principalAssetName);
+    const collatLogo = posAssetLogo(p.collateralPolicyId, p.collateralAssetName);
 
     return {
-      pool:       `<span class="surf-cell-main">${escHtml(pName)}</span>`,
+      pool:       `<span class="surf-cell-main">${iconHtml(poolLogo, pool?.asset.ticker)}${escHtml(pName)}</span>`,
       address:    `<span class="surf-cell-main">${escHtml(shorten(p.address, 6, 4))}</span>`,
       ltv:        `<span class="${ltvColor}" style="font-weight:600">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
-      collateral: `<span class="surf-cell-main">${fmtADA(p.collateral, p.collateralDecimals)}</span><span class="surf-cell-sub">${escHtml(p.collateralTicker)} · ${fmtUSD(p.collateralValueUSD)}</span>`,
-      borrow:     `<span class="surf-cell-main">${fmtADA(p.totalOwed, p.principalDecimals)}</span><span class="surf-cell-sub">${escHtml(p.principalTicker)} · ${fmtUSD(p.totalOwedUSD)}</span>`,
+      collateral: `<span class="surf-cell-main">${iconHtml(collatLogo, p.collateralTicker)}${fmtADA(p.collateral, p.collateralDecimals)}</span><span class="surf-cell-sub">${escHtml(p.collateralTicker)} · ${fmtUSD(p.collateralValueUSD)}</span>`,
+      borrow:     `<span class="surf-cell-main">${iconHtml(borrowLogo, p.principalTicker)}${fmtADA(p.totalOwed, p.principalDecimals)}</span><span class="surf-cell-sub">${escHtml(p.principalTicker)} · ${fmtUSD(p.totalOwedUSD)}</span>`,
       netvalue:   `<span class="surf-cell-main ${p.netValueUSD < 0 ? 'surf-txt-danger' : 'surf-txt-ok'}">${fmtUSD(p.netValueUSD)}</span>`,
       apr:        `<span class="surf-cell-main">${fmtPct(p.interestRate)}</span>`,
       duration:   `<span class="surf-cell-main">${fmtTime(p.elapsedYears)}</span>`,
