@@ -8,14 +8,6 @@ ALTER TABLE proposals ADD COLUMN IF NOT EXISTS allow_split BOOLEAN DEFAULT false
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS snapshot_block BIGINT;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS min_balance NUMERIC(40,0) DEFAULT 0;
 
-CREATE TABLE IF NOT EXISTS comments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    proposal_id UUID NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
-    voter_address VARCHAR(255) NOT NULL,
-    body TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- Delegations table (uncomment when delegation feature is wired)
 -- CREATE TABLE IF NOT EXISTS delegations (
 --     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

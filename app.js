@@ -60,7 +60,7 @@ const state = {
   filterToken: '',
   pollSearch: '',
   pollCategory: '',
-  commentPollId: null,
+
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -387,7 +387,7 @@ function renderProposals() {
             </div>
             ${tallyHtml}
             <div class="meta" style="margin-top:0.25rem">
-              <span class="comments-summary" data-poll-id="${p.id}">💬 comments</span>
+
             </div>
           </div>
         </div>
@@ -397,17 +397,10 @@ function renderProposals() {
 
   list.querySelectorAll('.proposal-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.card-actions') || e.target.closest('button') || e.target.closest('.comments-summary')) return;
+      if (e.target.closest('.card-actions') || e.target.closest('button')) return;
       card.classList.toggle('expanded');
       const extra = card.querySelector('.extra');
       if (extra) extra.style.display = card.classList.contains('expanded') ? '' : 'none';
-    });
-  });
-
-  list.querySelectorAll('.comments-summary').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openCommentsModal(el.dataset.pollId);
     });
   });
 
@@ -961,81 +954,6 @@ async function openAuditModal(proposalId) {
     $('#auditModal').classList.add('open');
   } catch (e) {
     toast('Audit error: ' + e.message, 'error');
-  }
-}
-
-/* ---------- Comments ---------- */
-
-async function openCommentsModal(pollId) {
-  try {
-    state.commentPollId = pollId;
-    $('#commentsModalTitle').textContent = 'Comments';
-    $('#commentInput').value = '';
-    await fetchComments(pollId);
-    $('#commentsModal').classList.add('open');
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
-  }
-}
-
-async function fetchComments(pollId) {
-  try {
-    const res = await fetch('/api/comments?pollId=' + encodeURIComponent(pollId));
-    if (!res.ok) throw new Error('Failed to load comments');
-    const comments = await res.json();
-    renderComments(comments);
-  } catch (e) {
-    $('#commentsList').innerHTML = '<p class="tooltip" style="text-align:center">Could not load comments</p>';
-  }
-}
-
-function renderComments(comments) {
-  const container = $('#commentsList');
-  if (comments.length === 0) {
-    container.innerHTML = '<p class="tooltip" style="text-align:center;padding:0.5rem 0">No comments yet.</p>';
-    return;
-  }
-  container.innerHTML = comments.map(c => `
-    <div class="comment-item">
-      <div class="comment-meta">${escHtml(shorten(c.voter_address, 8))} &middot; ${new Date(c.created_at).toLocaleString()}</div>
-      <div class="comment-body">${escHtml(c.body)}</div>
-    </div>
-  `).join('');
-}
-
-$('#commentSubmitBtn')?.addEventListener('click', submitComment);
-
-async function submitComment() {
-  if (!state.api) {
-    toast('Connect your wallet first', 'error');
-    return;
-  }
-  const body = $('#commentInput').value.trim();
-  if (!body) {
-    toast('Write a comment first', 'error');
-    return;
-  }
-  if (body.length > 2000) {
-    toast('Comment too long (max 2000 characters)', 'error');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pollId: state.commentPollId,
-        voterAddress: state.address,
-        body,
-      }),
-    });
-    if (!res.ok) throw new Error((await res.json()).error);
-    toast('Comment posted!', 'success');
-    $('#commentInput').value = '';
-    await fetchComments(state.commentPollId);
-  } catch (e) {
-    toast('Failed: ' + e.message, 'error');
   }
 }
 

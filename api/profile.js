@@ -46,18 +46,6 @@ export default async function handler(req, res) {
       proposal: propMap[v.proposal_id] || null,
     }));
 
-    // Get comment count (gracefully if comments table doesn't exist)
-    let commentCount = 0;
-    try {
-      const { count } = await supabase
-        .from('comments')
-        .select('*', { count: 'exact', head: true })
-        .eq('voter_address', address);
-      commentCount = count || 0;
-    } catch {
-      // comments table not migrated yet
-    }
-
     // Get proposals created by this address
     const { data: createdPolls, error: createdErr } = await supabase
       .from('proposals')
@@ -70,7 +58,6 @@ export default async function handler(req, res) {
     return res.json({
       address,
       totalVotes: votes.length,
-      totalComments: commentCount,
       totalCreated: (createdPolls || []).length,
       votes: enrichedVotes,
       created: createdPolls || [],
