@@ -1293,23 +1293,23 @@ select.surf-input {
 
 .activity-type-badge {
   display: inline-block;
-  padding: 0.12rem 0.45rem;
-  border-radius: 4px;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
   font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
-.activity-type-borrow { background: #3b82f6; color: #fff; }
-.activity-type-repay { background: #8b5cf6; color: #fff; }
-.activity-type-deposit { background: #3b82f6; color: #fff; }
-.activity-type-withdraw { background: #22c55e; color: #fff; }
-.activity-type-add-collateral { background: #22c55e; color: #fff; }
-.activity-type-cancel-borrow { background: #ef4444; color: #fff; }
-.activity-type-leveraged-borrow { background: #3b82f6; color: #fff; }
-.activity-type-repay-with-collateral { background: #8b5cf6; color: #fff; }
-.activity-type-liquidation { background: #ef4444; color: #fff; }
+.activity-type-borrow { background: rgba(59, 130, 246, 0.5); color: #fff; }
+.activity-type-repay { background: rgba(139, 92, 246, 0.5); color: #fff; }
+.activity-type-deposit { background: rgba(59, 130, 246, 0.5); color: #fff; }
+.activity-type-withdraw { background: rgba(34, 197, 94, 0.5); color: #fff; }
+.activity-type-add-collateral { background: rgba(34, 197, 94, 0.5); color: #fff; }
+.activity-type-cancel-borrow { background: rgba(239, 68, 68, 0.5); color: #fff; }
+.activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.5); color: #fff; }
+.activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.5); color: #fff; }
+.activity-type-liquidation { background: rgba(239, 68, 68, 0.5); color: #fff; }
 
 .activity-token-icon {
   width: 16px;
