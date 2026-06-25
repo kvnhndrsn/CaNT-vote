@@ -26,21 +26,15 @@ const KNOWN_WALLETS = [
 
 const TOKEN_LOGOS = {
   ADA: '/img/cardano-starburst.svg',
-  SNEK: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#22c55e"/><path d="M10 20c2-4 4-6 6-6s4 3 6 3-2 4-4 4-6-2-8-1z" fill="white" opacity=".9"/><circle cx="12" cy="13" r="1.5" fill="white"/><circle cx="20" cy="13" r="1.5" fill="white"/></svg>'),
-  NIGHT: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#6366f1"/><path d="M20 8c-5 0-9 4-9 9s4 9 9 9c-3 0-6-3-6-6s3-6 6-6z" fill="white" opacity=".9"/><circle cx="23" cy="11" r="1.2" fill="white" opacity=".7"/><circle cx="25" cy="16" r=".8" fill="white" opacity=".5"/></svg>'),
-  WMTX: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#3b82f6"/><circle cx="16" cy="16" r="6" fill="none" stroke="white" stroke-width="1.5" opacity=".9"/><path d="M10 10l3 3M22 10l-3 3M10 22l3-3M22 22l-3-3" stroke="white" stroke-width="1.5" opacity=".6"/><circle cx="16" cy="10" r="1" fill="white"/><circle cx="16" cy="22" r="1" fill="white"/><circle cx="10" cy="16" r="1" fill="white"/><circle cx="22" cy="16" r="1" fill="white"/></svg>'),
-  MIN: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#f59e0b"/><path d="M11 21l5-10 5 10" fill="none" stroke="white" stroke-width="1.8" stroke-linejoin="round" opacity=".9"/><path d="M13 18h6" stroke="white" stroke-width="1.5" opacity=".7"/></svg>'),
-  STRIKE: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ef4444"/><path d="M18 6l-6 12h4l-2 8 8-14h-4z" fill="white" opacity=".9"/></svg>'),
-  SUNDAE: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#ec4899"/><ellipse cx="16" cy="19" rx="7" ry="4" fill="white" opacity=".9"/><circle cx="13" cy="11" r="2.5" fill="white" opacity=".7"/><circle cx="16" cy="9" r="2" fill="white" opacity=".5"/><circle cx="19" cy="12" r="1.8" fill="white" opacity=".6"/></svg>'),
 };
 
 const CURATED_TOKENS = [
-  { label: 'SNEK',  policy: '279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f', asset: '534e454b', fingerprint: 'asset108xu02ckwrfc8qs9d97mgyh4kn8gdu9w8f5sxk', logo: TOKEN_LOGOS.SNEK },
-  { label: 'NIGHT', policy: '0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa', asset: '4e49474854', fingerprint: 'asset1wd3llgkhsw6etxf2yca6cgk9ssrpva3wf0pq9a', logo: TOKEN_LOGOS.NIGHT },
-  { label: 'WMTX',  policy: 'e5a42a1a1d3d1da71b0449663c32798725888d2eb0843c4dabeca05a', asset: '576f726c644d6f62696c65546f6b656e58', fingerprint: 'asset1l2xup5vr08s07lxg5c4kkj7ur624rv5ayzhyc7', logo: TOKEN_LOGOS.WMTX },
-  { label: 'MIN',   policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', fingerprint: 'asset1d9v7aptfvpx7we2la8f25kwprkj2ma5rp6uwzv', logo: TOKEN_LOGOS.MIN },
-  { label: 'STRIKE',policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', fingerprint: 'asset1tdalpjgjmt2vrhq9fvwzxqgqcq8ydr7e7e0eta', logo: TOKEN_LOGOS.STRIKE },
-  { label: 'SUNDAE',policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', fingerprint: 'asset1m4u92ke6820pkk07m8qmmguye02ewr8g6tezr0', logo: TOKEN_LOGOS.SUNDAE },
+  { label: 'SNEK',  policy: '279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f', asset: '534e454b', fingerprint: 'asset108xu02ckwrfc8qs9d97mgyh4kn8gdu9w8f5sxk' },
+  { label: 'NIGHT', policy: '0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa', asset: '4e49474854', fingerprint: 'asset1wd3llgkhsw6etxf2yca6cgk9ssrpva3wf0pq9a' },
+  { label: 'WMTX',  policy: 'e5a42a1a1d3d1da71b0449663c32798725888d2eb0843c4dabeca05a', asset: '576f726c644d6f62696c65546f6b656e58', fingerprint: 'asset1l2xup5vr08s07lxg5c4kkj7ur624rv5ayzhyc7' },
+  { label: 'MIN',   policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', fingerprint: 'asset1d9v7aptfvpx7we2la8f25kwprkj2ma5rp6uwzv' },
+  { label: 'STRIKE',policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', fingerprint: 'asset1tdalpjgjmt2vrhq9fvwzxqgqcq8ydr7e7e0eta' },
+  { label: 'SUNDAE',policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', fingerprint: 'asset1m4u92ke6820pkk07m8qmmguye02ewr8g6tezr0' },
 ];
 
 const POLL_COLORS = [
@@ -458,14 +452,12 @@ function updateCountdowns() {
 
 function tokenLogo(policyId, fingerprint, label) {
   if (!policyId && !fingerprint) return TOKEN_LOGOS.ADA;
-  if (label && TOKEN_LOGOS[label]) return TOKEN_LOGOS[label];
+  const assetHex = policyId && (CURATED_TOKENS.find(t => t.policy === policyId)?.asset || '');
+  const fullHex = assetHex ? policyId + assetHex : null;
+  if (fullHex && tokenLogoCache.has(fullHex)) return tokenLogoCache.get(fullHex);
   if (fingerprint) {
     const t = CURATED_TOKENS.find(t => t.fingerprint === fingerprint);
-    if (t) return t.logo;
-  }
-  if (policyId) {
-    const t = CURATED_TOKENS.find(t => t.policy === policyId);
-    if (t) return t.logo;
+    if (t && tokenLogoCache.has(t.policy + t.asset)) return tokenLogoCache.get(t.policy + t.asset);
   }
   return null;
 }
@@ -1489,7 +1481,6 @@ $$('.tab').forEach(tab => {
     const view = tab.dataset.view;
     $('#mainView').style.display = view === 'polls' ? '' : 'none';
     $('#portfolioView').style.display = view === 'portfolio' ? '' : 'none';
-    $('#profileView').style.display = view === 'profile' ? '' : 'none';
     $('#surfView').style.display = view === 'surf' ? '' : 'none';
     $('#analyticsView').style.display = view === 'analytics' ? '' : 'none';
     $('#activityView').style.display = view === 'activity' ? '' : 'none';
@@ -1500,10 +1491,7 @@ $$('.tab').forEach(tab => {
         fetchPortfolio();
       }
     }
-    if (view === 'profile') {
-      fetchProfile();
-    }
-    if (view === 'surf') {
+    if (view === 'surf' || view === 'analytics') {
       fetchSurfDashboard();
       if (surfRefreshInterval) clearInterval(surfRefreshInterval);
       surfRefreshInterval = setInterval(fetchSurfDashboard, 60000);
@@ -1598,7 +1586,7 @@ function renderSurfDashboard() {
 }
 
 function renderSurfSummary(summary) {
-  const el = $('#surfSummary');
+  const el = $('#analyticsSurfSummary');
   const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const adaPrice = summary.adaPrice || 1;
@@ -2072,7 +2060,7 @@ function resolveActivityAsset(assetHex, fallbackTicker) {
   if (cachedLogo) return { label: fallbackTicker || '?', logo: cachedLogo };
   const policyId = assetHex.slice(0, 56);
   const match = CURATED_TOKENS.find(t => t.policy === policyId);
-  if (match) return { label: match.label, logo: match.logo };
+  if (match) return { label: match.label, logo: null };
   return { label: fallbackTicker || '?', logo: null };
 }
 
@@ -2131,76 +2119,6 @@ $('#activityAddressFilter')?.addEventListener('input', () => {
   activityAddressTimeout = setTimeout(() => { activityPage = 1; fetchActivity(); }, 400);
 });
 
-/* ---------- Epoch ---------- */
-
-let epochInterval = null;
-let epochTickInterval = null;
-let epochData = null;
-
-const EPOCH_SLOTS = 432000;
-
-function epochSvg() {
-  return '<svg class="epoch-icon" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="var(--accent)" stroke-width="2"/><path d="M16 6v10l7 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>';
-}
-
-async function fetchEpoch() {
-  try {
-    const res = await fetch('/api/epoch');
-    if (!res.ok) return;
-    const data = await res.json();
-    data.fetchedAt = Date.now();
-    epochData = data;
-    renderEpoch();
-  } catch {
-    if (!epochData) {
-      $('#epochBar').innerHTML = '<div class="epoch-error">Could not load epoch info</div>';
-    }
-  }
-}
-
-function renderEpoch() {
-  if (!epochData) return;
-  const now = Date.now();
-  const elapsed = (now - epochData.fetchedAt) / 1000;
-  const remaining = Math.max(0, epochData.remainingSeconds - elapsed);
-  const progress = ((EPOCH_SLOTS - remaining) / EPOCH_SLOTS) * 100;
-
-  const fmt = epochCountdown(remaining);
-
-  $('#epochBar').innerHTML = `
-    <div class="epoch-card">
-      <div class="epoch-badge">
-        ${epochSvg()}
-        <span class="epoch-number">Epoch ${epochData.epochNo}</span>
-      </div>
-      <div class="epoch-bar-wrap">
-        <div class="epoch-bar-track">
-          <div class="epoch-bar-fill" style="width:${Math.min(progress, 100)}%"></div>
-        </div>
-        <span class="epoch-pct">${progress.toFixed(1)}%</span>
-      </div>
-      <span class="epoch-countdown">${fmt}</span>
-    </div>
-  `;
-}
-
-function epochCountdown(seconds) {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (d > 0) return d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
-  if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
-  if (m > 0) return m + 'm ' + s + 's';
-  return s + 's';
-}
-
-function startEpochTicker() {
-  fetchEpoch();
-  epochInterval = setInterval(fetchEpoch, 60000);
-  epochTickInterval = setInterval(renderEpoch, 1000);
-}
-
 /* ---------- Poll Search & Filter ---------- */
 
 $('#pollSearch')?.addEventListener('input', (e) => {
@@ -2220,7 +2138,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateWalletUI();
   fetchProposals();
   startTicker();
-  startEpochTicker();
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);

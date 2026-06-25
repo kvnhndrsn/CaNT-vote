@@ -11,26 +11,25 @@
 <body>
 
 <header>
-  <div class="logo"><span>CNT</span> Poll</div>
   <nav>
-    <button class="btn btn-sm btn-ghost" id="themeBtn">☀</button>
-    <button class="btn btn-sm" id="createBtn" style="display:none">+ New Poll</button>
-    <div id="walletArea">
-      <button class="btn btn-sm btn-primary" id="connectBtn">Connect Wallet</button>
+    <div class="nav-tabs">
+      <button class="tab tab-active" data-view="polls">Polls</button>
+      <button class="tab" data-view="portfolio">Portfolio</button>
+      <button class="tab" data-view="surf"><svg class="tab-surf-icon" viewBox="0 0 16 16" fill="none"><path d="M2 10c2-3 5 2 7 0s2-4 5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/></svg> Positions</button>
+      <button class="tab" data-view="analytics"><svg class="tab-surf-icon" viewBox="0 0 16 16" fill="none"><path d="M2 10c2-3 5 2 7 0s2-4 5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/></svg> Analytics</button>
+      <button class="tab" data-view="activity"><svg class="tab-surf-icon" viewBox="0 0 16 16" fill="none"><path d="M2 10c2-3 5 2 7 0s2-4 5-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/></svg> Activity</button>
+    </div>
+    <div class="nav-actions">
+      <button class="btn btn-sm btn-ghost" id="themeBtn">☀</button>
+      <button class="btn btn-sm" id="createBtn" style="display:none">+ New Poll</button>
+      <div id="walletArea">
+        <button class="btn btn-sm btn-primary" id="connectBtn">Connect Wallet</button>
+      </div>
     </div>
   </nav>
 </header>
 
 <main class="container">
-  <div id="epochBar"></div>
-  <div class="tabs">
-    <button class="tab tab-active" data-view="polls">Polls</button>
-    <button class="tab" data-view="portfolio">Portfolio <span class="badge badge-beta">Beta</span></button>
-    <button class="tab" data-view="profile">My Profile</button>
-    <button class="tab" data-view="surf">Surf Lending <span class="badge badge-beta">Beta</span></button>
-    <button class="tab" data-view="analytics">Analytics</button>
-    <button class="tab" data-view="activity">Activity</button>
-  </div>
   <div id="mainView">
     <div class="mini-cards" id="miniCards"></div>
     <div class="poll-toolbar">
@@ -57,17 +56,12 @@
     <div class="section-title">Portfolio</div>
     <div id="portfolioContent"></div>
   </div>
-  <div id="profileView" style="display:none">
-    <div class="section-title">My Profile</div>
-    <div id="profileContent"></div>
-  </div>
   <div id="surfView" style="display:none">
     <div class="surf-header">
       <div class="section-title">
-        <span>Surf Lending Dashboard</span>
+        <span>Positions</span>
         <span class="badge badge-surf">Live</span>
       </div>
-      <div class="surf-summary" id="surfSummary"></div>
     </div>
     <div class="surf-filters">
       <input type="text" id="surfAddressFilter" placeholder="Filter by address..." class="surf-input">
@@ -92,6 +86,7 @@
         <span>SURF Protocol Analytics</span>
         <span class="badge badge-surf">Beta</span>
       </div>
+      <div class="surf-summary" id="analyticsSurfSummary"></div>
       <div class="analytics-ranges">
         <button class="btn btn-sm chart-range" data-days="1">24H</button>
         <button class="btn btn-sm chart-range active" data-days="7">7D</button>
@@ -148,7 +143,7 @@
           <option value="Cancel Borrow">Cancel Borrow</option>
           <option value="Leveraged Borrow">Leveraged Borrow</option>
           <option value="Repay With Collateral">Repay With Collateral</option>
-          <option value="Liquidation">Liquidation</option>
+          <option value="Liquidate">Liquidate</option>
         </select>
         <input type="text" id="activityAddressFilter" placeholder="Filter by address..." class="activity-filter-input">
         <span id="activityUpdated" class="activity-updated"></span>

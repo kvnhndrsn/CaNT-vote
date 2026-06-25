@@ -81,18 +81,31 @@ header {
   height: 52px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   background: var(--surface);
   position: sticky;
   top: 0;
   z-index: 50;
 }
 
-header .logo { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.02em; }
+header nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 1rem; }
 
-header .logo span { color: var(--primary); }
+.nav-tabs { display: flex; align-items: center; gap: 0; height: 100%; }
+.nav-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 
-header nav { display: flex; align-items: center; gap: 0.5rem; }
+.nav-tabs .tab {
+  padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 500;
+  border: none; background: transparent; color: var(--text3);
+  cursor: pointer; font-family: inherit;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.nav-tabs .tab:hover { color: var(--text); }
+.nav-tabs .tab-active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.tab-surf-icon { width: 14px; height: 14px; flex-shrink: 0; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 0.3rem;
@@ -363,23 +376,6 @@ header nav { display: flex; align-items: center; gap: 0.5rem; }
 }
 
 /* ---------- Tabs ---------- */
-
-.tabs {
-  display: flex; gap: 0; margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 500;
-  border: none; background: transparent; color: var(--text3);
-  cursor: pointer; font-family: inherit;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  transition: all 0.15s;
-}
-
-.tab:hover { color: var(--text); }
-.tab-active { color: var(--primary); border-bottom-color: var(--primary); }
-.badge-beta { font-size: 0.55rem; padding: 0.05rem 0.3rem; vertical-align: middle; background: var(--primary); color: #fff; }
 
 /* ---------- Portfolio ---------- */
 
@@ -891,92 +887,6 @@ select.surf-input {
 
 .footer-text { color: var(--text3); }
 
-/* ---------- Epoch Bar ---------- */
-
-#epochBar {
-  margin-bottom: 0.75rem;
-  min-height: 48px;
-}
-
-#epochBar:empty { min-height: 0; margin-bottom: 0; }
-
-.epoch-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.55rem 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.epoch-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-
-.epoch-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.epoch-number {
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.epoch-bar-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.epoch-bar-track {
-  flex: 1;
-  height: 6px;
-  background: var(--surface2);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.epoch-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.epoch-pct {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  width: 3.4rem;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.epoch-countdown {
-  font-size: 0.72rem;
-  color: var(--text3);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.epoch-error {
-  font-size: 0.72rem;
-  color: var(--text3);
-  text-align: center;
-  padding: 0.5rem 0;
-}
-
 /* ---------- Poll Toolbar ---------- */
 
 .poll-toolbar {
@@ -1209,8 +1119,9 @@ select.surf-input {
 
 @media (max-width: 640px) {
   .container { padding: 1rem; }
-  header { padding: 0 1rem; }
-  header .logo { font-size: 0.95rem; }
+  header { padding: 0 0.75rem; }
+  header nav { gap: 0.5rem; }
+  .nav-tabs .tab { padding: 0.45rem 0.5rem; font-size: 0.75rem; }
   .modal { padding: 1rem; }
   .card-title-row { flex-wrap: wrap; }
   .card-actions { margin-left: auto; }
@@ -1310,6 +1221,7 @@ select.surf-input {
 .activity-type-leveraged-borrow { background: rgba(59, 130, 246, 0.3); color: #fff; }
 .activity-type-repay-with-collateral { background: rgba(139, 92, 246, 0.3); color: #fff; }
 .activity-type-liquidation { background: rgba(239, 68, 68, 0.3); color: #fff; }
+.activity-type-liquidate { background: rgba(239, 68, 68, 0.3); color: #fff; }
 
 .activity-token-icon {
   width: 16px;
