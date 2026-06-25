@@ -1753,6 +1753,17 @@ function renderSurfPositions(positions, pools, summary) {
 
   const iconHtml = (logoSrc, alt) => logoSrc ? `<img class="surf-token-icon" src="${escHtml(logoSrc)}" alt="${escHtml(alt)}">` : '';
 
+  function poolIcons(pool) {
+    if (!pool) return '';
+    const supplyLogo = poolAssetLogo(pool.asset);
+    const collLogos = (pool.collateralAssets || []).slice(0, 2).map(c => poolAssetLogo({ policyId: c.policyId, assetName: c.assetName }));
+    const icons = [];
+    if (supplyLogo) icons.push(supplyLogo);
+    for (const logo of collLogos) if (logo) icons.push(logo);
+    if (icons.length === 0) return '';
+    return `<span class="surf-token-pile">${icons.map((src, i) => `<img class="surf-token-icon" src="${escHtml(src)}" alt="">`).join('')}</span> `;
+  }
+
   function poolDisplayName(pool) {
     if (!pool) return '';
     const borrowed = pool.asset.ticker;
@@ -1783,7 +1794,7 @@ function renderSurfPositions(positions, pools, summary) {
     const collatLogo = posAssetLogo(p.collateralPolicyId, p.collateralAssetName);
 
     return {
-      pool:       `<span class="surf-cell-main">${iconHtml(poolLogo, pool?.asset.ticker)}${escHtml(pName)}</span>`,
+      pool:       `<span class="surf-cell-main">${poolIcons(pool)}${escHtml(pName)}</span>`,
       address:    `<span class="surf-cell-main">${escHtml(displayAddr(p.address, shorten(p.address, 6, 4)))}</span>`,
       ltv:        `<span class="${ltvColor}" style="font-weight:600">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
       collateral: `<span class="surf-cell-main">${iconHtml(collatLogo, p.collateralTicker)}${fmtADA(p.collateral, p.collateralDecimals)}</span><span class="surf-cell-sub">${escHtml(p.collateralTicker)} · ${fmtUSD(p.collateralValueUSD)}</span>`,

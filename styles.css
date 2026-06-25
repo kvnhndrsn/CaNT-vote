@@ -727,6 +727,22 @@ select.surf-input {
   margin-right: 0.25rem;
 }
 
+.surf-token-pile {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+.surf-token-pile .surf-token-icon {
+  margin-right: -5px;
+  border: 1px solid var(--bg, #1e1e2e);
+  position: relative;
+  border-radius: 50%;
+}
+.surf-token-pile .surf-token-icon:last-child {
+  margin-right: 0;
+}
+
 /* Text color helpers */
 .surf-txt-ok { color: var(--success); font-weight: 600; }
 .surf-txt-warning { color: #f59e0b; font-weight: 600; }
