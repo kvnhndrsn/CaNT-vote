@@ -778,6 +778,116 @@ select.surf-input {
   }
 }
 
+/* ---------- Staking Stats ---------- */
+
+.staking-stats {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.staking-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.staking-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.staking-header img {
+  width: 22px;
+  height: 22px;
+}
+
+.staking-header h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text1);
+}
+
+.staking-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.staking-stat {
+  background: var(--surface2);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+}
+
+.staking-stat-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  margin-bottom: 0.15rem;
+}
+
+.staking-stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text1);
+}
+
+.staking-stat-sub {
+  font-size: 0.62rem;
+  color: var(--text3);
+  margin-top: 0.05rem;
+}
+
+.staking-rewards-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.staking-reward-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.staking-reward-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text3);
+}
+
+.staking-reward-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text1);
+  margin-top: 0.1rem;
+}
+
+.staking-next-period {
+  font-size: 0.62rem;
+  color: var(--text3);
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 640px) {
+  .staking-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .staking-rewards-row {
+    flex-direction: column;
+  }
+}
+
 /* ---------- SURF Analytics ---------- */
 
 .analytics-header {

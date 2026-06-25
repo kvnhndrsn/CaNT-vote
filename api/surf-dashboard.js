@@ -26,11 +26,14 @@ export default async function handler(req, res) {
   const { address } = req.query;
 
   try {
-    const [poolData, posData, surfPriceData, adaPriceData] = await Promise.all([
+    const [poolData, posData, surfPriceData, adaPriceData, stakingInfo, stakingApy, stakingChart] = await Promise.all([
       surfFetch('/api/getAllPoolInfos'),
       surfFetch('/api/getAllPositions' + (address ? `?address=${encodeURIComponent(address)}` : '')),
       surfFetch('/api/getSurfPrice'),
       surfFetch('/api/getAdaPrice'),
+      surfFetch('/api/staking/getInfo'),
+      surfFetch('/api/staking/getAPY'),
+      surfFetch('/api/staking/getRewardsChart'),
     ]);
 
     if (!poolData) {
@@ -192,6 +195,11 @@ export default async function handler(req, res) {
         surfPriceUSD: surfPrice * adaPrice,
         adaPrice,       // usd per ADA
         fetchedAt: Date.now(),
+      },
+      staking: {
+        info: stakingInfo?.info || null,
+        apy: stakingApy || null,
+        rewardsChart: stakingChart?.data || [],
       },
     });
   } catch (e) {

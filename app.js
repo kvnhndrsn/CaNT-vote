@@ -1503,7 +1503,7 @@ function renderPortfolio(data) {
 /* ---------- Tab switching ---------- */
 
 $$('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
+  tab.addEventListener('click', async () => {
     $$('.tab').forEach(t => t.classList.remove('tab-active'));
     tab.classList.add('tab-active');
     const view = tab.dataset.view;
@@ -1520,7 +1520,7 @@ $$('.tab').forEach(tab => {
       }
     }
     if (view === 'surf' || view === 'analytics') {
-      fetchSurfDashboard();
+      await fetchSurfDashboard();
       if (surfRefreshInterval) clearInterval(surfRefreshInterval);
       surfRefreshInterval = setInterval(fetchSurfDashboard, 60000);
       if (surfTickInterval) clearInterval(surfTickInterval);
@@ -1876,6 +1876,7 @@ let analyticsUnit = 'usd';
 function destroyAnalyticsCharts() {
   for (const c of analyticsCharts) { if (c) c.destroy(); }
   analyticsCharts = [];
+  if (stakingChart) { stakingChart.destroy(); stakingChart = null; }
 }
 
 function analyticsThemeColors() {
@@ -1903,6 +1904,9 @@ async function renderAnalytics() {
       container.style.display = 'none'; empty.style.display = '';
       return;
     }
+
+    // staking stats (from surf dashboard data)
+    renderStakingStats();
 
     container.style.display = ''; empty.style.display = 'none';
     destroyAnalyticsCharts();
@@ -2045,10 +2049,149 @@ async function renderAnalytics() {
         },
       },
     });
+
+    // staking rewards chart
+    if (surfData?.staking?.rewardsChart) {
+      renderStakingChart(surfData.staking.rewardsChart);
+    }
   } catch (e) {
     container.style.display = 'none'; empty.style.display = '';
     empty.querySelector('p').textContent = 'Error: ' + e.message;
   }
+}
+
+/* ---------- Staking ---------- */
+
+let stakingChart = null;
+
+function renderStakingStats() {
+  const el = $('#stakingStats');
+  const staking = surfData?.staking;
+  if (!staking?.info) { el.innerHTML = ''; return; }
+  const info = staking.info;
+  const apy = staking.apy || {};
+
+  const toADA = (v) => {
+    if (v >= 1e15) return (v / 1e15).toFixed(2) + 'P';
+    if (v >= 1e12) return (v / 1e12).toFixed(2) + 'T';
+    if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+    if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+    return v.toFixed(0);
+  };
+
+  const nextPeriod = info.nextStakingPeriodStart
+    ? new Date(info.nextStakingPeriodStart).toLocaleDateString()
+    : '--';
+  const lastDist = info.lastRewardsDistributionDate
+    ? new Date(info.lastRewardsDistributionDate).toLocaleDateString()
+    : '--';
+
+  el.innerHTML = `
+    <div class="staking-card">
+      <div class="staking-header">
+        <img src="/img/surf.svg" alt="">
+        <h3>SURF Staking</h3>
+      </div>
+      <div class="staking-grid">
+        <div class="staking-stat">
+          <div class="staking-stat-label">Total Staked</div>
+          <div class="staking-stat-value">${toADA(info.totalLiveStake)} SURF</div>
+          <div class="staking-stat-sub">${(info.liveStakedCirculatingSupply * 100).toFixed(1)}% of circ</div>
+        </div>
+        <div class="staking-stat">
+          <div class="staking-stat-label">Stakers</div>
+          <div class="staking-stat-value">${info.totalStakeLiveUniqueStakers}</div>
+          <div class="staking-stat-sub">${info.totalStakeUniqueStakers} active</div>
+        </div>
+        <div class="staking-stat">
+          <div class="staking-stat-label">Period APY</div>
+          <div class="staking-stat-value" style="color:var(--success)">${(apy.periodApy || 0).toFixed(2)}%</div>
+          <div class="staking-stat-sub">Aggregated: ${(apy.aggregatedApy || 0).toFixed(2)}%</div>
+        </div>
+        <div class="staking-stat">
+          <div class="staking-stat-label">Distributed</div>
+          <div class="staking-stat-value">${toADA(info.totalDistributedRewards)} SURF</div>
+          <div class="staking-stat-sub">${info.totalStakeLiveUniqueStakers} stakers</div>
+        </div>
+      </div>
+      <div class="staking-rewards-row">
+        <div class="staking-reward-box">
+          <span class="staking-reward-label">Current Period Rewards</span>
+          <span class="staking-reward-value">${toADA(info.totalPeriodRewards)} SURF</span>
+        </div>
+        <div class="staking-reward-box">
+          <span class="staking-reward-label">Next Period Rewards</span>
+          <span class="staking-reward-value">${toADA(info.totalNextPeriodRewards)} SURF</span>
+        </div>
+        <div class="staking-reward-box">
+          <span class="staking-reward-label">Last Distribution</span>
+          <span class="staking-reward-value">${lastDist}</span>
+        </div>
+        <div class="staking-reward-box">
+          <span class="staking-reward-label">Next Period Start</span>
+          <span class="staking-reward-value">${nextPeriod}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderStakingChart(snapshots) {
+  const canvas = document.querySelector('#chartStakingRewards canvas');
+  if (!canvas || !snapshots || snapshots.length < 2) return;
+  if (stakingChart) { stakingChart.destroy(); stakingChart = null; }
+
+  const C = analyticsThemeColors();
+  const labels = snapshots.map(s => {
+    const d = new Date(s.date);
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  });
+
+  stakingChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Rewards',
+          data: snapshots.map(s => s.global / 1e6),
+          backgroundColor: C.accent + '44',
+          borderColor: C.accent,
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Stakers',
+          data: snapshots.map(s => s.staker),
+          borderColor: C.blue,
+          backgroundColor: C.blue + '22',
+          pointRadius: 0,
+          tension: 0.3,
+          type: 'line',
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: C.text, font: { size: 10 }, usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+        tooltip: {
+          backgroundColor: C.surface, titleColor: C.text, bodyColor: C.text,
+          borderColor: C.grid, borderWidth: 1, cornerRadius: 6, padding: 8,
+          bodyFont: { size: 11 },
+        },
+      },
+      interaction: { intersect: false, mode: 'index' },
+      scales: {
+        x: { grid: { color: C.grid, tickLength: 4 }, ticks: { color: C.text, maxTicksLimit: 10, font: { size: 9 } } },
+        y: { grid: { color: C.grid }, position: 'left', title: { display: true, text: 'SURF Rewards', color: C.text3, font: { size: 9 } }, ticks: { color: C.text, font: { size: 9 }, callback: (v) => v >= 1e3 ? (v / 1e3).toFixed(0) + 'M' : v.toFixed(0) } },
+        y1: { grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'Stakers', color: C.text3, font: { size: 9 } }, ticks: { color: C.text, font: { size: 9 } } },
+      },
+    },
+  });
 }
 
 $$('.chart-range').forEach(btn => {
