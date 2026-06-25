@@ -35,6 +35,7 @@ const CURATED_TOKENS = [
   { label: 'MIN',   policy: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6', asset: '4d494e', fingerprint: 'asset1d9v7aptfvpx7we2la8f25kwprkj2ma5rp6uwzv' },
   { label: 'STRIKE',policy: 'f13ac4d66b3ee19a6aa0f2a22298737bd907cc95121662fc971b5275', asset: '535452494b45', fingerprint: 'asset1tdalpjgjmt2vrhq9fvwzxqgqcq8ydr7e7e0eta' },
   { label: 'SUNDAE',policy: '9a9693a9a37912a5097918f97918d15240c92ab729a0b7c4aa144d77', asset: '53554e444145', fingerprint: 'asset1m4u92ke6820pkk07m8qmmguye02ewr8g6tezr0' },
+  { label: 'SURF',  policy: '2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80', asset: '464c4f57', fingerprint: '' },
 ];
 
 const POLL_COLORS = [
@@ -2166,6 +2167,15 @@ document.addEventListener('DOMContentLoaded', () => {
   updateWalletUI();
   fetchProposals();
   startTicker();
+  // Load SURF token icon for nav tabs
+  const surfHex = '2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80464c4f57';
+  fetchTokenIcon(surfHex).then(logo => {
+    if (logo) {
+      document.querySelectorAll('[data-tab-icon="surf"]').forEach(el => {
+        el.innerHTML = `<img src="${logo}" alt="SURF">`;
+      });
+    }
+  });
 });
 
 $('#connectBtn')?.addEventListener('click', openWalletModal);
