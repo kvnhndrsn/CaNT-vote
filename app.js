@@ -2120,6 +2120,12 @@ async function fetchActivity() {
   }
 }
 
+function tokenIconHtml(ticker) {
+  const logo = TOKEN_LOGOS[ticker];
+  if (!logo) return '';
+  return '<img class="activity-token-icon" src="' + logo + '" alt="' + ticker + '">';
+}
+
 function renderActivity(data, container, pagination) {
   if (!data.data || data.data.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>No activity found.</p></div>';
@@ -2131,16 +2137,18 @@ function renderActivity(data, container, pagination) {
   $('#activityUpdated').textContent = data.total + ' events';
 
   let html = '<table class="activity-table"><thead><tr>';
-  html += '<th>Type</th><th>Amount</th><th>Pool</th><th>Address</th><th>Time</th><th>Tx</th>';
+  html += '<th>Activity</th><th>Address</th><th>Amount</th><th>Collateral</th><th>Time</th><th>Tx</th>';
   html += '</tr></thead><tbody>';
 
   for (const a of data.data) {
     const typeClass = 'activity-type-' + a.activity_type.toLowerCase().replace(/\s+/g, '-');
+    const amountIcon = tokenIconHtml(a.asset_ticker);
+    const collatIcon = tokenIconHtml(a.collateral_ticker);
     html += '<tr>';
     html += '<td><span class="activity-type-badge ' + typeClass + '">' + escHtml(a.activity_type) + '</span></td>';
-    html += '<td class="activity-amount">' + escHtml(a.amount_fmt) + '</td>';
-    html += '<td>' + escHtml(a.pool_ticker) + '</td>';
     html += '<td title="' + escHtml(a.address) + '">' + escHtml(a.address_short) + '</td>';
+    html += '<td class="activity-amount">' + amountIcon + escHtml(a.amount_fmt) + ' ' + escHtml(a.asset_ticker) + '</td>';
+    html += '<td class="activity-amount">' + collatIcon + escHtml(a.collateral_fmt) + ' ' + escHtml(a.collateral_ticker) + '</td>';
     html += '<td class="activity-time">' + escHtml(a.time_ago) + '</td>';
     html += '<td><a href="' + a.cardanoscan_link + '" target="_blank" rel="noopener" class="activity-tx-link">view</a></td>';
     html += '</tr>';

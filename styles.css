@@ -1343,10 +1343,21 @@ select.surf-input {
 .activity-type-cancel-borrow { background: #ef4444; color: #fff; }
 .activity-type-leveraged-borrow { background: #d946ef; color: #fff; }
 .activity-type-repay-with-collateral { background: #f97316; color: #fff; }
+.activity-type-liquidation { background: #ef4444; color: #fff; }
+
+.activity-token-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  border-radius: 50%;
+  display: inline-block;
+}
 
 .activity-amount {
   font-variant-numeric: tabular-nums;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .activity-time {

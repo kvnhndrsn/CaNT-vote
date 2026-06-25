@@ -16,6 +16,12 @@ function shortenAddr(addr, chars = 6) {
   return addr.slice(0, chars) + '...' + addr.slice(-chars);
 }
 
+function formatToken(val) {
+  if (val >= 1e6) return val.toLocaleString(undefined, { maximumFractionDigits: 0 }) + 'M';
+  if (val >= 1e3) return val.toLocaleString(undefined, { maximumFractionDigits: 0 }) + 'K';
+  return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 export default async function handler(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -48,6 +54,7 @@ export default async function handler(req, res) {
     const poolData = await surfFetch('/api/getAllPoolInfos');
     const pools = poolData?.poolInfos || poolData || {};
     const poolMap = {};
+    const assetLookup = {};
     for (const [pid, info] of Object.entries(pools)) {
       const asset = info.asset || {};
       poolMap[pid] = {
@@ -55,22 +62,36 @@ export default async function handler(req, res) {
         decimals: asset.decimals || 0,
         price: info.price || 0,
       };
+      const addAsset = (a) => {
+        if (!a) return;
+        const key = (a.policyId || '') + (a.assetName || '');
+        if (key && !assetLookup[key]) {
+          assetLookup[key] = { ticker: a.ticker || '?', decimals: a.decimals || 0 };
+        }
+      };
+      addAsset(info.asset);
+      if (info.collateralAssets) {
+        for (const c of info.collateralAssets) addAsset(c.asset);
+      }
     }
+    assetLookup[''] = { ticker: 'ADA', decimals: 6 };
 
     const enriched = data.map(a => {
       const pool = poolMap[a.pool_id] || {};
-      const decimals = pool.decimals || 0;
-      const divisor = Math.pow(10, decimals);
-      const amountAda = a.amount / divisor;
-      const collatAda = a.collateral_amount / divisor;
+      const amountInfo = assetLookup[a.asset] || { ticker: pool.ticker, decimals: pool.decimals };
+      const collatInfo = assetLookup[a.collateral_asset] || { ticker: '?', decimals: 0 };
+      const amountDiv = Math.pow(10, amountInfo.decimals);
+      const collatDiv = Math.pow(10, collatInfo.decimals);
+      const amountVal = a.amount / amountDiv;
+      const collatVal = a.collateral_amount / collatDiv;
       return {
         ...a,
         address_short: shortenAddr(a.address),
         pool_ticker: pool.ticker || '?',
-        amount_ada: amountAda,
-        collateral_ada: collatAda,
-        amount_fmt: amountAda >= 1e3 ? amountAda.toLocaleString(undefined, { maximumFractionDigits: 0 }) + 'K'
-          : amountAda.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+        asset_ticker: amountInfo.ticker,
+        collateral_ticker: collatInfo.ticker,
+        amount_fmt: formatToken(amountVal),
+        collateral_fmt: formatToken(collatVal),
         time_ago: timeAgo(a.activity_time),
         cardanoscan_link: 'https://cardanoscan.io/transaction/' + a.tx_hash,
       };
