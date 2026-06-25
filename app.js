@@ -2055,14 +2055,8 @@ async function fetchActivity() {
     const data = await res.json();
     const uniqueAssets = new Set();
     for (const a of data.data) {
-      if (a.asset) {
-        const policyId = a.asset.slice(0, 56);
-        if (!CURATED_TOKENS.find(t => t.policy === policyId)) uniqueAssets.add(a.asset);
-      }
-      if (a.collateral_asset) {
-        const policyId = a.collateral_asset.slice(0, 56);
-        if (!CURATED_TOKENS.find(t => t.policy === policyId)) uniqueAssets.add(a.collateral_asset);
-      }
+      if (a.asset) uniqueAssets.add(a.asset);
+      if (a.collateral_asset) uniqueAssets.add(a.collateral_asset);
     }
     await Promise.all([...uniqueAssets].map(fetchTokenIcon));
     renderActivity(data, container, pagination);
@@ -2074,11 +2068,11 @@ async function fetchActivity() {
 
 function resolveActivityAsset(assetHex, fallbackTicker) {
   if (!assetHex) return { label: 'ADA', logo: TOKEN_LOGOS.ADA };
+  const cachedLogo = tokenLogoCache.get(assetHex);
+  if (cachedLogo) return { label: fallbackTicker || '?', logo: cachedLogo };
   const policyId = assetHex.slice(0, 56);
   const match = CURATED_TOKENS.find(t => t.policy === policyId);
   if (match) return { label: match.label, logo: match.logo };
-  const cachedLogo = tokenLogoCache.get(assetHex);
-  if (cachedLogo) return { label: fallbackTicker || '?', logo: cachedLogo };
   return { label: fallbackTicker || '?', logo: null };
 }
 
