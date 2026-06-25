@@ -74,6 +74,28 @@ function shorten(s, n = 8) {
   return s.slice(0, n) + '...' + s.slice(-n);
 }
 
+const handleCache = new Map();
+
+async function prefetchHandles(addresses) {
+  const uncached = [...new Set(addresses.filter(a => a && a.startsWith('addr') && !handleCache.has(a)))];
+  if (uncached.length === 0) return;
+  try {
+    const res = await fetch('/api/resolve-handles?addresses=' + encodeURIComponent(uncached.join(',')));
+    if (!res.ok) return;
+    const map = await res.json();
+    for (const [addr, handle] of Object.entries(map)) {
+      handleCache.set(addr, handle);
+    }
+  } catch {}
+}
+
+function displayAddr(address, fallback) {
+  if (!address) return fallback || '';
+  const h = handleCache.get(address);
+  if (h) return h;
+  return fallback || shorten(address, 6);
+}
+
 function formatWeight(w) {
   const n = BigInt(w);
   if (n >= 1_000_000n) return (Number(n) / 1_000_000).toFixed(2) + 'M';
@@ -101,6 +123,7 @@ async function fetchProposals() {
       throw new Error(body.error || `Server error (${res.status})`);
     }
     state.proposals = await res.json();
+    prefetchHandles(state.proposals.map(p => p.creator_address));
     renderMiniCards();
     renderFilter();
     renderProposals();
@@ -371,7 +394,7 @@ function renderProposals() {
               <span class="poll-category">${escHtml(category)}</span>
               <span>${escHtml(assetLabel)}</span>
               <span class="expiry" data-expires="${p.expiresAt}">--</span>
-              <span>by ${escHtml(shorten(p.creator_address, 6))}</span>
+              <span>by ${escHtml(displayAddr(p.creator_address, shorten(p.creator_address, 6)))}</span>
             </div>
             <div class="desc">${escHtml(p.description)}</div>
             <div class="extra" style="display:none">
@@ -565,7 +588,8 @@ async function connectWallet(walletId) {
     state.stakeAddresses = rewardAddrs.map(h => hexToBech32(h));
 
     updateWalletUI();
-    toast('Connected: ' + shorten(state.address, 8), 'success');
+    prefetchHandles(state.addresses).then(() => updateWalletUI());
+    toast('Connected: ' + displayAddr(state.address, shorten(state.address, 8)), 'success');
     $('#walletModal').classList.remove('open');
   } catch (e) {
     console.error(e);
@@ -591,7 +615,7 @@ function updateWalletUI() {
   const area = $('#walletArea');
   if (state.address) {
     area.innerHTML = `
-      <span class="tooltip" style="margin-right:0.1rem;font-size:0.7rem">${escHtml(shorten(state.address, 5))}</span>
+      <span class="tooltip" style="margin-right:0.1rem;font-size:0.7rem">${escHtml(displayAddr(state.address, shorten(state.address, 5)))}</span>
       <button class="btn btn-sm" id="disconnectBtn">Disconnect</button>
     `;
     $('#disconnectBtn').addEventListener('click', disconnectWallet);
@@ -906,6 +930,8 @@ async function openAuditModal(proposalId) {
 
     $('#auditInfo').textContent = `${data.votes.length} vote(s)`;
 
+    prefetchHandles(data.votes.map(v => v.voter_address));
+
     if (data.votes.length === 0) {
       $('#auditTableWrap').innerHTML = '<p class="tooltip" style="text-align:center;padding:1rem 0">No votes recorded yet.</p>';
     } else {
@@ -922,7 +948,7 @@ async function openAuditModal(proposalId) {
           <tbody>
             ${data.votes.map(v => `
               <tr>
-                <td>${escHtml(shorten(v.voter_address, 6))}</td>
+                <td>${escHtml(displayAddr(v.voter_address, shorten(v.voter_address, 6)))}</td>
                 <td>${escHtml(v.vote_choice)}</td>
                 <td>${formatWeight(v.stake_weight)}</td>
                 <td title="${escHtml(v.signature_hex)}">${escHtml(shorten(v.signature_hex, 6))}</td>
@@ -965,6 +991,7 @@ async function fetchProfile() {
     const res = await fetch('/api/profile?address=' + encodeURIComponent(state.address));
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
+    if (state.address) prefetchHandles([state.address]);
     renderProfile(data);
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><strong>Could not load profile</strong><p>' + escHtml(e.message) + '</p></div>';
@@ -979,7 +1006,7 @@ function renderProfile(data) {
     <div class="profile-header">
       <div class="profile-avatar">${initial}</div>
       <div>
-        <div style="font-size:0.82rem;font-weight:600">${escHtml(shorten(data.address, 12))}</div>
+        <div style="font-size:0.82rem;font-weight:600">${escHtml(displayAddr(data.address, shorten(data.address, 12)))}</div>
         <div class="profile-stats" style="margin-top:0.5rem">
           <div class="profile-stat">
             <div class="profile-stat-value">${data.totalVotes}</div>
@@ -1757,7 +1784,7 @@ function renderSurfPositions(positions, pools, summary) {
 
     return {
       pool:       `<span class="surf-cell-main">${iconHtml(poolLogo, pool?.asset.ticker)}${escHtml(pName)}</span>`,
-      address:    `<span class="surf-cell-main">${escHtml(shorten(p.address, 6, 4))}</span>`,
+      address:    `<span class="surf-cell-main">${escHtml(displayAddr(p.address, shorten(p.address, 6, 4)))}</span>`,
       ltv:        `<span class="${ltvColor}" style="font-weight:600">${fmtPct(p.ltv)}</span><span class="surf-ltv-bar"><span class="surf-ltv-bar-fill" style="width:${Math.min(ltvPct * 100, 100)}%"></span></span>`,
       collateral: `<span class="surf-cell-main">${iconHtml(collatLogo, p.collateralTicker)}${fmtADA(p.collateral, p.collateralDecimals)}</span><span class="surf-cell-sub">${escHtml(p.collateralTicker)} · ${fmtUSD(p.collateralValueUSD)}</span>`,
       borrow:     `<span class="surf-cell-main">${iconHtml(borrowLogo, p.principalTicker)}${fmtADA(p.totalOwed, p.principalDecimals)}</span><span class="surf-cell-sub">${escHtml(p.principalTicker)} · ${fmtUSD(p.totalOwedUSD)}</span>`,
@@ -1773,6 +1800,9 @@ function renderSurfPositions(positions, pools, summary) {
   const totalBorrowUSD = filtered.reduce((s, p) => s + p.totalOwedUSD, 0);
   const totalCollateralUSD = filtered.reduce((s, p) => s + p.collateralValueUSD, 0);
   const weightedApr = filtered.reduce((s, p) => s + (p.interestRate || 0) * (p.totalOwedUSD || 0), 0) / (totalBorrowUSD || 1);
+
+  // prefetch handles for all addresses in this view
+  prefetchHandles(filtered.map(p => p.address));
 
   let html = `<div class="surf-count-bar">`;
   html += `<span class="surf-count">${filtered.length} position${filtered.length !== 1 ? 's' : ''}</span>`;
@@ -2076,6 +2106,7 @@ async function fetchActivity() {
       if (a.collateral_asset) uniqueAssets.add(a.collateral_asset);
     }
     await Promise.all([...uniqueAssets].map(fetchTokenIcon));
+    prefetchHandles(data.data.map(a => a.address));
     renderActivity(data, container, pagination);
   } catch (e) {
     container.innerHTML = '<div class="empty-state"><p>Error: ' + escHtml(e.message) + '</p></div>';
@@ -2115,7 +2146,7 @@ function renderActivity(data, container, pagination) {
     const collatIcon = collatRes.logo ? '<img class="activity-token-icon" src="' + collatRes.logo + '" alt="' + collatRes.label + '">' : '';
     html += '<tr>';
     html += '<td><span class="activity-type-badge ' + typeClass + '">' + escHtml(a.activity_type) + '</span></td>';
-    html += '<td title="' + escHtml(a.address) + '">' + escHtml(a.address_short) + '</td>';
+    html += '<td title="' + escHtml(a.address) + '">' + escHtml(displayAddr(a.address, a.address_short)) + '</td>';
     html += '<td class="activity-amount">' + amountIcon + escHtml(a.amount_fmt) + ' ' + escHtml(amountRes.label) + '</td>';
     html += '<td class="activity-amount">' + collatIcon + escHtml(a.collateral_fmt) + ' ' + escHtml(collatRes.label) + '</td>';
     html += '<td class="activity-time">' + escHtml(a.time_ago) + '</td>';
