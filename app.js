@@ -1687,6 +1687,11 @@ function renderSurfSummary(summary, pools, positions) {
   const totalReserveADA = pools.reduce((s, p) => s + toADA((p.reserve || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice), 0);
   const totalVolumeADA = pools.reduce((s, p) => s + (p.totalVolume || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1), 0);
 
+  const netInterestIncomeADA = pools.reduce((sum, p) => {
+    const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
+    const sAda = toADA((p.totalSupplied || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
+    return sum + bAda * (p.borrowApr || 0) - sAda * (p.supplyApyTotal || 0);
+  }, 0);
   let weightedBorrowApr = 0, weightedSupplyApy = 0, borrowWeight = 0, supplyWeight = 0;
   for (const p of pools) {
     const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
@@ -1696,7 +1701,6 @@ function renderSurfSummary(summary, pools, positions) {
   }
   const avgBorrowApr = borrowWeight > 0 ? weightedBorrowApr / borrowWeight : 0;
   const avgSupplyApy = supplyWeight > 0 ? weightedSupplyApy / supplyWeight : 0;
-  const netInterestIncomeADA = totalBorrowADA * avgBorrowApr - totalSupplyADA * avgSupplyApy;
 
   const ltvValues = positions.filter(p => p.ltv > 0).map(p => p.ltv);
   const avgLtv = ltvValues.length > 0 ? ltvValues.reduce((s, v) => s + v, 0) / ltvValues.length : 0;
