@@ -40,10 +40,20 @@ const CURATED_TOKENS = [
 
 let Chart = null;
 
+function loadChartScript() {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
 async function ensureChart() {
   if (Chart) return;
-  const mod = await import('https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js');
-  Chart = mod.default || mod.Chart || mod;
+  await loadChartScript();
+  Chart = window.Chart;
 }
 
 const POLL_COLORS = [
