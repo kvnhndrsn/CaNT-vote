@@ -1530,6 +1530,7 @@ $$('.tab').forEach(tab => {
     $('#analyticsView').style.display = view === 'analytics' ? '' : 'none';
     $('#activityView').style.display = view === 'activity' ? '' : 'none';
     $('#surfTokenView').style.display = view === 'surf-token' ? '' : 'none';
+    $('#poolsView').style.display = view === 'pools' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
         $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
@@ -1537,7 +1538,7 @@ $$('.tab').forEach(tab => {
         fetchPortfolio();
       }
     }
-    if (view === 'surf' || view === 'analytics' || view === 'surf-token') {
+    if (view === 'surf' || view === 'analytics' || view === 'surf-token' || view === 'pools') {
       await fetchSurfDashboard();
       if (surfRefreshInterval) clearInterval(surfRefreshInterval);
       surfRefreshInterval = setInterval(fetchSurfDashboard, 120000);
@@ -1558,6 +1559,9 @@ $$('.tab').forEach(tab => {
     }
     if (view === 'surf-token') {
       renderSurfTokenStats();
+    }
+    if (view === 'pools') {
+      if (surfData) renderPoolDeepDive(surfData.pools, surfData.summary);
     }
     if (view === 'activity') {
       fetchActivity();
@@ -1648,7 +1652,6 @@ async function renderSurfDashboard() {
   renderSurfPoolApys(pools, summary);
   renderSurfPositions(positions, pools, summary);
   renderProtocolBreakdown(pools, positions, summary);
-  renderPoolDeepDive(pools, summary);
   renderRiskAnalysis(positions, pools, summary);
 }
 
@@ -1685,13 +1688,6 @@ function renderSurfSummary(summary, pools, positions) {
   const collatRatio = totalBorrowADA > 0 ? totalCollatADA / totalBorrowADA : 0;
 
   const totalReserveADA = pools.reduce((s, p) => s + toADA((p.reserve || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice), 0);
-  const totalVolumeADA = pools.reduce((s, p) => s + (p.totalVolume || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1), 0);
-
-  const netInterestIncomeADA = pools.reduce((sum, p) => {
-    const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
-    const rf = p.reserveFactor || 0;
-    return sum + bAda * (p.borrowApr || 0) * rf;
-  }, 0);
   let weightedBorrowApr = 0, weightedSupplyApy = 0, borrowWeight = 0, supplyWeight = 0;
   for (const p of pools) {
     const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
@@ -1786,23 +1782,9 @@ function renderSurfSummary(summary, pools, positions) {
           <div class="bento-sub">${fmtUSD(summary.surfPriceUSD)}</div>
         </div>
         <div class="bento-cell">
-          <div class="bento-label">ADA Price</div>
-          <div class="bento-value">${fmtUSD(adaPrice)}</div>
-          <div class="bento-sub">1 ADA = $${adaPrice.toFixed(4)}</div>
-        </div>
-        <div class="bento-cell">
-          <div class="bento-label">Net Interest Income (annualized)</div>
-          <div class="bento-value ${netInterestIncomeADA >= 0 ? 'bento-txt-success' : 'bento-txt-danger'}">${fmtADA(Math.abs(netInterestIncomeADA))}</div>
-          <div class="bento-sub">${netInterestIncomeADA >= 0 ? 'Protocol surplus' : 'Protocol deficit'}</div>
-        </div>
-        <div class="bento-cell">
           <div class="bento-label">Avg LTV</div>
           <div class="bento-value">${fmtPct(avgLtv)}</div>
           <div class="bento-sub">${healthy} healthy · ${atRisk} at risk · ${liquidatable} liquidatable</div>
-        </div>
-        <div class="bento-cell">
-          <div class="bento-label">Total Volume (all-time)</div>
-          <div class="bento-value">${fmtADA(totalVolumeADA)}</div>
         </div>
         <div class="bento-cell">
           <div class="bento-label">Net Collateralization</div>
@@ -2169,32 +2151,22 @@ function renderRevenueBreakdown() {
   const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtShort = (v) => { if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K'; return v.toFixed(2); };
 
-  const poolRevenues = pools.map(p => {
+  const poolReserves = pools.map(p => {
     const dec = p.asset.decimals || 0;
-    const bAda = ((p.totalBorrowed || 0) / Math.pow(10, dec)) * (p.price || 1);
     const reserveAda = ((p.reserve || 0) / Math.pow(10, dec)) * (p.price || 1);
     const unpaidAda = ((p.totalUnpaidInterest || 0) / Math.pow(10, dec)) * (p.price || 1);
-    const revAda = bAda * (p.borrowApr || 0) * (p.reserveFactor || 0);
-    return { ticker: p.asset.ticker, revAda, reserveAda, unpaidAda, borrowedAda: bAda };
+    return { ticker: p.asset.ticker, reserveAda, unpaidAda };
   });
 
-  const reserveRevAda = poolRevenues.reduce((s, r) => s + r.revAda, 0);
-  const totalReserveAda = poolRevenues.reduce((s, r) => s + r.reserveAda, 0);
-  const totalUnpaidAda = poolRevenues.reduce((s, r) => s + r.unpaidAda, 0);
-  const protocolUnpaidAda = totalUnpaidAda * 0.1;
+  const totalReserveAda = poolReserves.reduce((s, r) => s + r.reserveAda, 0);
+  const protocolUnpaidAda = poolReserves.reduce((s, r) => s + r.unpaidAda, 0) * 0.1;
 
   const stakingInfo = staking?.info;
   const allTimeDistributed = stakingInfo ? (stakingInfo.totalDistributedRewards || 0) / 1e6 : 0;
   const currentPeriodRewards = stakingInfo ? (stakingInfo.totalPeriodRewards || 0) / 1e6 : 0;
-  const nextPeriodRewards = stakingInfo ? (stakingInfo.totalNextPeriodRewards || 0) / 1e6 : 0;
 
-  const annualStakingRewards = currentPeriodRewards * 365 / (stakingInfo?.stakingPeriodInDays || 15);
-  const reserveShareOfAnnual = annualStakingRewards > 0 ? reserveRevAda / annualStakingRewards : 0;
-  const allTimeReservePortion = allTimeDistributed * Math.min(1, reserveShareOfAnnual);
-  const allTimeLiqOpenPortion = allTimeDistributed - allTimeReservePortion;
-
-  const topRevenues = poolRevenues.filter(r => r.revAda > 0).sort((a, b) => b.revAda - a.revAda);
-  const maxReserve = Math.max(...topRevenues.map(r => r.revAda), 1);
+  const topReserves = poolReserves.filter(r => r.reserveAda > 0).sort((a, b) => b.reserveAda - a.reserveAda);
+  const maxReserve = Math.max(...topReserves.map(r => r.reserveAda), 1);
 
   wrap.innerHTML = `
     <div class="revenue-section">
@@ -2203,59 +2175,20 @@ function renderRevenueBreakdown() {
       <div class="revenue-method">
         <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--accent)"></span> <strong>Borrow reserve (10%)</strong> — protocol cut of all borrow interest</div>
         <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--warning)"></span> <strong>Liquidation fees (15%)</strong> — <span class="tooltip">70% → stakers · 30% → LPs</span> penalty on liquidated positions</div>
-        <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--amber)"></span> <strong>Position open fees (1%)</strong> — charged when opening a borrow position</div>
+        <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--success)"></span> <strong>Position open fees (1%)</strong> — charged when opening a borrow position</div>
       </div>
 
       <div class="revenue-divider"></div>
 
-      <div class="revenue-subtitle">All-Time Protocol Revenue</div>
-      <div class="revenue-total">${fmtADA(allTimeDistributed)}</div>
-      <div class="stacked-bar-section">
-        <div class="rev-bar-row">
-          <span class="rev-bar-label">Reserve</span>
-          <div class="rev-bar-track">
-            <div class="rev-bar-fill" style="width:${allTimeReservePortion / (allTimeDistributed || 1) * 100}%;background:var(--accent)"></div>
-          </div>
-          <span class="rev-bar-val">${fmtShort(allTimeReservePortion)}</span>
-          <span class="rev-bar-pct">${allTimeDistributed > 0 ? (allTimeReservePortion / allTimeDistributed * 100).toFixed(1) + '%' : '—'}</span>
-        </div>
-        <div class="rev-bar-row">
-          <span class="rev-bar-label">Liq. + open</span>
-          <div class="rev-bar-track">
-            <div class="rev-bar-fill" style="width:${allTimeLiqOpenPortion / (allTimeDistributed || 1) * 100}%;background:var(--warning)"></div>
-          </div>
-          <span class="rev-bar-val">${fmtShort(allTimeLiqOpenPortion)}</span>
-          <span class="rev-bar-pct">${allTimeDistributed > 0 ? (allTimeLiqOpenPortion / allTimeDistributed * 100).toFixed(1) + '%' : '—'}</span>
-        </div>
-      </div>
-
-      <div class="revenue-divider"></div>
-
-      <div class="revenue-subtitle">Reserve Revenue by Pool <span class="tooltip">Current annual rate · proportional split applied to all-time</span></div>
-      <div class="stacked-bar-section">
-        ${topRevenues.map(r => `
-          <div class="rev-bar-row">
-            <span class="rev-bar-label">${escHtml(r.ticker)}</span>
-            <div class="rev-bar-track">
-              <div class="rev-bar-fill" style="width:${r.revAda / maxReserve * 100}%;background:var(--accent)"></div>
-            </div>
-            <span class="rev-bar-val">${fmtShort(r.revAda)}</span>
-            <span class="rev-bar-pct">${reserveRevAda > 0 ? (r.revAda / reserveRevAda * 100).toFixed(1) + '%' : '—'}</span>
-          </div>
-        `).join('')}
-      </div>
-
-      <div class="revenue-divider"></div>
-
-      <div class="revenue-subtitle">Snapshot</div>
+      <div class="revenue-subtitle">All-Time</div>
       <div class="revenue-hist-grid">
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Total Distributed</div>
+          <div class="revenue-hist-label">Distributed to Stakers</div>
           <div class="revenue-hist-value">${fmtADA(allTimeDistributed)}</div>
-          <div class="revenue-hist-sub">All-time ADA paid to stakers</div>
+          <div class="revenue-hist-sub">Total protocol revenue all-time</div>
         </div>
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Current Reserves</div>
+          <div class="revenue-hist-label">In Pool Reserves</div>
           <div class="revenue-hist-value">${fmtADA(totalReserveAda)}</div>
           <div class="revenue-hist-sub">Not yet distributed</div>
         </div>
@@ -2265,10 +2198,26 @@ function renderRevenueBreakdown() {
           <div class="revenue-hist-sub">${stakingInfo?.stakingPeriodInDays || 15}-day rewards</div>
         </div>
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Next Period</div>
-          <div class="revenue-hist-value">${fmtADA(nextPeriodRewards)}</div>
-          <div class="revenue-hist-sub">Upcoming rewards bucket</div>
+          <div class="revenue-hist-label">Reserves Pending</div>
+          <div class="revenue-hist-value">${fmtADA(protocolUnpaidAda)}</div>
+          <div class="revenue-hist-sub">Protocol share of accrued interest</div>
         </div>
+      </div>
+
+      <div class="revenue-divider"></div>
+
+      <div class="revenue-subtitle">Reserves by Pool</div>
+      <div class="stacked-bar-section">
+        ${topReserves.map(r => `
+          <div class="rev-bar-row">
+            <span class="rev-bar-label">${escHtml(r.ticker)}</span>
+            <div class="rev-bar-track">
+              <div class="rev-bar-fill" style="width:${r.reserveAda / maxReserve * 100}%;background:var(--accent)"></div>
+            </div>
+            <span class="rev-bar-val">${fmtShort(r.reserveAda)}</span>
+            <span class="rev-bar-pct">${totalReserveAda > 0 ? (r.reserveAda / totalReserveAda * 100).toFixed(1) + '%' : '—'}</span>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;

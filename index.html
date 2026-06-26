@@ -22,6 +22,7 @@
       <button class="tab" data-view="portfolio">Portfolio</button>
       <button class="tab" data-view="surf"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Positions</button>
       <button class="tab" data-view="analytics"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Analytics</button>
+      <button class="tab" data-view="pools"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Pools</button>
       <button class="tab" data-view="activity"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Activity</button>
       <button class="tab" data-view="surf-token">SURF</button>
     </div>
@@ -93,7 +94,6 @@
     </div>
     <div class="surf-summary" id="analyticsSurfSummary"></div>
     <div id="protocolBreakdownContainer"></div>
-    <div id="poolDeepDiveContainer"></div>
     <div id="riskAnalysisContainer"></div>
     <div class="staking-stats" id="stakingStats"></div>
     <div class="analytics-grid" id="analyticsContent">
@@ -131,6 +131,9 @@
         <p>No snapshot data yet. Run the snapshot endpoint to start collecting data.</p>
       </div>
     </div>
+  </div>
+  <div id="poolsView" style="display:none">
+    <div id="poolDeepDiveContainer" style="width:100%"></div>
   </div>
   <div id="activityView" style="display:none">
     <div class="activity-filters">
