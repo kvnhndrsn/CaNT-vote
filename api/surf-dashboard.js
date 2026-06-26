@@ -260,6 +260,7 @@ export default async function handler(req, res) {
         totalBorrowedUSD: positions.reduce((s, p) => s + p.totalOwedUSD, 0),
         totalCollateralUSD: positions.reduce((s, p) => s + p.collateralValueUSD, 0),
         totalNetValueUSD: positions.reduce((s, p) => s + p.netValueUSD, 0),
+        totalTVLUSD: poolsArray.reduce((s, p) => s + p.totalSuppliedUSD, 0) + positions.reduce((s, p) => s + p.collateralValueUSD, 0) - positions.reduce((s, p) => s + p.totalOwedUSD, 0),
         surfPrice,      // ada per SURF
         surfPriceUSD,
         adaPrice,       // usd per ADA

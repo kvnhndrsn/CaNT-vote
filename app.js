@@ -1700,9 +1700,14 @@ function renderSurfSummary(summary) {
           <span class="summary-stat-sub">${fmtUSD(summary.surfPriceUSD)}</span>
         </div>
         <div class="summary-stat">
+          <span class="summary-stat-label">Total Supplied</span>
+          <span class="summary-stat-value">${fmtADA(toADA(summary.totalSuppliedUSD))}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.totalSuppliedUSD)}</span>
+        </div>
+        <div class="summary-stat">
           <span class="summary-stat-label">Total TVL</span>
-          <span class="summary-stat-value">${fmtADA(toADA(summary.totalCollateralUSD + summary.totalBorrowedUSD))}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.totalCollateralUSD + summary.totalBorrowedUSD)}</span>
+          <span class="summary-stat-value">${fmtADA(toADA(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD)))}</span>
+          <span class="summary-stat-sub">${fmtUSD(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD))}</span>
         </div>
       </div>
     </div>
@@ -2017,7 +2022,7 @@ async function renderAnalytics() {
         { label: 'Total Supplied', data: snap.map(s => toUnit(s.total_supplied_usd, s.ada_price)), borderColor: C.accent, backgroundColor: C.accent + '18', fill: true, tension: 0.3, pointRadius: 0 },
         { label: 'Total Borrowed', data: snap.map(s => toUnit(s.total_borrowed_usd, s.ada_price)), borderColor: C.amber, tension: 0.3, pointRadius: 0 },
         { label: 'Total Collateral', data: snap.map(s => toUnit(s.total_collateral_usd, s.ada_price)), borderColor: C.blue, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
-        { label: 'TVL', data: snap.map(s => toUnit((s.total_collateral_usd || 0) + (s.total_borrowed_usd || 0), s.ada_price)), borderColor: C.green, tension: 0.3, pointRadius: 0 },
+        { label: 'TVL', data: snap.map(s => toUnit((s.total_supplied_usd || 0) + (s.total_collateral_usd || 0) - (s.total_borrowed_usd || 0), s.ada_price)), borderColor: C.green, tension: 0.3, pointRadius: 0 },
       ]),
       options: { ...base(), scales: { x: xAxis(), y: yAxis(moneyTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
     });
