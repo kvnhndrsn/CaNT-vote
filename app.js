@@ -2166,92 +2166,112 @@ function renderRevenueBreakdown() {
   const wrap = $('#revenueBreakdownWrap');
   if (!wrap || !surfData) return;
   const { pools, summary, staking } = surfData;
-  const adaPrice = summary.adaPrice || 1;
-  const toADA = (usd) => usd / adaPrice;
   const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtShort = (v) => { if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K'; return v.toFixed(2); };
-  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
 
   const poolRevenues = pools.map(p => {
     const dec = p.asset.decimals || 0;
     const bAda = ((p.totalBorrowed || 0) / Math.pow(10, dec)) * (p.price || 1);
-    const sAda = ((p.totalSupplied || 0) / Math.pow(10, dec)) * (p.price || 1);
     const reserveAda = ((p.reserve || 0) / Math.pow(10, dec)) * (p.price || 1);
     const unpaidAda = ((p.totalUnpaidInterest || 0) / Math.pow(10, dec)) * (p.price || 1);
     const revAda = bAda * (p.borrowApr || 0) * (p.reserveFactor || 0);
-    return { ticker: p.asset.ticker, revAda, reserveAda, unpaidAda, borrowedAda: bAda, suppliedAda: sAda };
+    return { ticker: p.asset.ticker, revAda, reserveAda, unpaidAda, borrowedAda: bAda };
   });
 
-  const totalRevAda = poolRevenues.reduce((s, r) => s + r.revAda, 0);
+  const reserveRevAda = poolRevenues.reduce((s, r) => s + r.revAda, 0);
   const totalReserveAda = poolRevenues.reduce((s, r) => s + r.reserveAda, 0);
   const totalUnpaidAda = poolRevenues.reduce((s, r) => s + r.unpaidAda, 0);
-  const protocolUnpaidAda = totalUnpaidAda * 0.1; // reserveFactor share
+  const protocolUnpaidAda = totalUnpaidAda * 0.1;
 
   const stakingInfo = staking?.info;
   const allTimeDistributed = stakingInfo ? (stakingInfo.totalDistributedRewards || 0) / 1e6 : 0;
   const currentPeriodRewards = stakingInfo ? (stakingInfo.totalPeriodRewards || 0) / 1e6 : 0;
-  const coveragePct = currentPeriodRewards > 0 ? (totalRevAda / (currentPeriodRewards * 365 / 15) * 100) : 0;
+  const nextPeriodRewards = stakingInfo ? (stakingInfo.totalNextPeriodRewards || 0) / 1e6 : 0;
+
+  const annualStakingRewards = currentPeriodRewards * 365 / (stakingInfo?.stakingPeriodInDays || 15);
+  const reserveShareOfAnnual = annualStakingRewards > 0 ? reserveRevAda / annualStakingRewards : 0;
+  const allTimeReservePortion = allTimeDistributed * Math.min(1, reserveShareOfAnnual);
+  const allTimeLiqOpenPortion = allTimeDistributed - allTimeReservePortion;
 
   const topRevenues = poolRevenues.filter(r => r.revAda > 0).sort((a, b) => b.revAda - a.revAda);
-  const maxRev = Math.max(...topRevenues.map(r => r.revAda), 1);
+  const maxReserve = Math.max(...topRevenues.map(r => r.revAda), 1);
 
   wrap.innerHTML = `
     <div class="revenue-section">
-      <div class="revenue-subtitle">Annualized Reserve Revenue <span class="tooltip">10% reserve factor on all borrow interest</span></div>
-      <div class="revenue-total">${fmtADA(totalRevAda)} <span class="revenue-per-year">/ year</span></div>
+
+      <div class="revenue-subtitle">Revenue Sources</div>
+      <div class="revenue-method">
+        <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--accent)"></span> <strong>Borrow reserve (10%)</strong> — protocol cut of all borrow interest</div>
+        <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--warning)"></span> <strong>Liquidation fees (15%)</strong> — <span class="tooltip">70% → stakers · 30% → LPs</span> penalty on liquidated positions</div>
+        <div class="revenue-method-item"><span class="revenue-method-dot" style="background:var(--amber)"></span> <strong>Position open fees (1%)</strong> — charged when opening a borrow position</div>
+      </div>
+
+      <div class="revenue-divider"></div>
+
+      <div class="revenue-subtitle">All-Time Protocol Revenue</div>
+      <div class="revenue-total">${fmtADA(allTimeDistributed)}</div>
+      <div class="stacked-bar-section">
+        <div class="rev-bar-row">
+          <span class="rev-bar-label">Reserve</span>
+          <div class="rev-bar-track">
+            <div class="rev-bar-fill" style="width:${allTimeReservePortion / (allTimeDistributed || 1) * 100}%;background:var(--accent)"></div>
+          </div>
+          <span class="rev-bar-val">${fmtShort(allTimeReservePortion)}</span>
+          <span class="rev-bar-pct">${allTimeDistributed > 0 ? (allTimeReservePortion / allTimeDistributed * 100).toFixed(1) + '%' : '—'}</span>
+        </div>
+        <div class="rev-bar-row">
+          <span class="rev-bar-label">Liq. + open</span>
+          <div class="rev-bar-track">
+            <div class="rev-bar-fill" style="width:${allTimeLiqOpenPortion / (allTimeDistributed || 1) * 100}%;background:var(--warning)"></div>
+          </div>
+          <span class="rev-bar-val">${fmtShort(allTimeLiqOpenPortion)}</span>
+          <span class="rev-bar-pct">${allTimeDistributed > 0 ? (allTimeLiqOpenPortion / allTimeDistributed * 100).toFixed(1) + '%' : '—'}</span>
+        </div>
+      </div>
+
+      <div class="revenue-divider"></div>
+
+      <div class="revenue-subtitle">Reserve Revenue by Pool <span class="tooltip">Current annual rate · proportional split applied to all-time</span></div>
       <div class="stacked-bar-section">
         ${topRevenues.map(r => `
           <div class="rev-bar-row">
             <span class="rev-bar-label">${escHtml(r.ticker)}</span>
             <div class="rev-bar-track">
-              <div class="rev-bar-fill" style="width:${r.revAda / maxRev * 100}%;background:var(--accent)"></div>
+              <div class="rev-bar-fill" style="width:${r.revAda / maxReserve * 100}%;background:var(--accent)"></div>
             </div>
             <span class="rev-bar-val">${fmtShort(r.revAda)}</span>
-            <span class="rev-bar-pct">${totalRevAda > 0 ? (r.revAda / totalRevAda * 100).toFixed(1) + '%' : '—'}</span>
+            <span class="rev-bar-pct">${reserveRevAda > 0 ? (r.revAda / reserveRevAda * 100).toFixed(1) + '%' : '—'}</span>
           </div>
         `).join('')}
       </div>
+
       <div class="revenue-divider"></div>
-      <div class="revenue-subtitle">Historical Revenue</div>
+
+      <div class="revenue-subtitle">Snapshot</div>
       <div class="revenue-hist-grid">
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Total Reserves Accumulated</div>
-          <div class="revenue-hist-value">${fmtADA(totalReserveAda)}</div>
-          <div class="revenue-hist-sub">Protocol fees held in pools</div>
-        </div>
-        <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Uncollected Revenue (pending)</div>
-          <div class="revenue-hist-value">${fmtADA(protocolUnpaidAda)}</div>
-          <div class="revenue-hist-sub">Protocol share of accrued interest</div>
-        </div>
-      </div>
-      <div class="revenue-divider"></div>
-      <div class="revenue-subtitle">Staking Rewards Context</div>
-      <div class="revenue-hist-grid">
-        <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">All-Time Distributed</div>
+          <div class="revenue-hist-label">Total Distributed</div>
           <div class="revenue-hist-value">${fmtADA(allTimeDistributed)}</div>
-          <div class="revenue-hist-sub">Total ADA paid to stakers</div>
+          <div class="revenue-hist-sub">All-time ADA paid to stakers</div>
         </div>
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Current Period Rewards</div>
+          <div class="revenue-hist-label">Current Reserves</div>
+          <div class="revenue-hist-value">${fmtADA(totalReserveAda)}</div>
+          <div class="revenue-hist-sub">Not yet distributed</div>
+        </div>
+        <div class="revenue-hist-cell">
+          <div class="revenue-hist-label">Current Period</div>
           <div class="revenue-hist-value">${fmtADA(currentPeriodRewards)}</div>
-          <div class="revenue-hist-sub">${periodDaysStr(stakingInfo)} period</div>
+          <div class="revenue-hist-sub">${stakingInfo?.stakingPeriodInDays || 15}-day rewards</div>
         </div>
         <div class="revenue-hist-cell">
-          <div class="revenue-hist-label">Revenue Coverage</div>
-          <div class="revenue-hist-value" style="color:${coveragePct >= 100 ? 'var(--success)' : 'var(--warning)'}">${coveragePct.toFixed(0)}%</div>
-          <div class="revenue-hist-sub">Annual reserve rev ÷ annualized staking rewards</div>
+          <div class="revenue-hist-label">Next Period</div>
+          <div class="revenue-hist-value">${fmtADA(nextPeriodRewards)}</div>
+          <div class="revenue-hist-sub">Upcoming rewards bucket</div>
         </div>
       </div>
-      <div class="revenue-note">Reserve factor revenue may not be the sole source of staking rewards. Additional sources may include liquidation fees and SURF token incentives.</div>
     </div>
   `;
-
-  function periodDaysStr(info) {
-    const days = info?.stakingPeriodInDays || 15;
-    return days + '-day';
-  }
 }
 
 function renderSurfPoolFilter(pools) {
