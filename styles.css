@@ -1559,39 +1559,107 @@ select.surf-input {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Protocol Token Breakdown ---------- */
+/* ============================================================
+   OVERVIEW BENTO GRID
+   ============================================================ */
 
-.protocol-breakdown {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+.summary-card-wide {
+  margin-bottom: 0.5rem;
 }
 
-.breakdown-row {
+.stats-bento {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.4rem;
+  padding: 0.5rem 0 0 0;
+}
+
+.bento-cell {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 0.55rem 0.6rem;
+  min-width: 0;
+}
+
+.bento-cell-lg {
+  grid-column: span 2;
+  background: var(--surface2);
+  background: linear-gradient(135deg, var(--surface2) 0%, color-mix(in srgb, var(--accent) 8%, var(--surface2)) 100%);
+  border: 1px solid var(--border);
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
+}
+
+.bento-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+  margin-bottom: 0.15rem;
+}
+
+.bento-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text1);
+  line-height: 1.2;
+}
+
+.bento-sub {
+  font-size: 0.65rem;
+  color: var(--text3);
+  margin-top: 0.1rem;
+}
+
+.bento-txt-success { color: var(--success) !important; }
+.bento-txt-danger  { color: var(--danger) !important; }
+.bento-txt-warning { color: var(--warning) !important; }
+.bento-txt-ok      { color: var(--text1) !important; }
+
+/* ============================================================
+   TOKEN DISTRIBUTION BREAKDOWN
+   ============================================================ */
+
+.breakdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.breakdown-group {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.breakdown-cat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  margin-bottom: 0.3rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.breakdown-row-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text3);
-  width: 5rem;
-  flex-shrink: 0;
-  text-align: right;
+.breakdown-cat-total {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .breakdown-bar {
-  flex: 1;
   display: flex;
-  height: 20px;
-  border-radius: 4px;
+  height: 22px;
+  border-radius: 5px;
   overflow: hidden;
-  background: var(--surface2);
+  background: var(--surface);
+  margin-bottom: 0.35rem;
 }
 
 .breakdown-bar-empty {
@@ -1606,16 +1674,17 @@ select.surf-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
-  padding: 0 3px;
+  padding: 0 4px;
   font-size: 0.6rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   transition: flex 0.2s;
   position: relative;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 .breakdown-seg:nth-child(8n+1) { background: #3b82f6; }
@@ -1628,29 +1697,250 @@ select.surf-input {
 .breakdown-seg:nth-child(8n+8) { background: #14b8a6; }
 .breakdown-seg:nth-child(8n+0) { background: #f97316; }
 
-.breakdown-seg:only-child {
-  border-radius: 4px;
-}
-
-.breakdown-seg:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.breakdown-seg:last-child {
-  border-radius: 0 4px 4px 0;
-}
-
-.breakdown-seg:only-child {
-  border-radius: 4px;
-}
+.breakdown-seg:first-child { border-radius: 5px 0 0 5px; }
+.breakdown-seg:last-child  { border-radius: 0 5px 5px 0; }
+.breakdown-seg:only-child  { border-radius: 5px; }
 
 .breakdown-icon {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
+  border-radius: 50%;
 }
 
 .breakdown-seg-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.breakdown-token-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.15rem;
+  font-size: 0.68rem;
+}
+
+.breakdown-token-row + .breakdown-token-row {
+  border-top: 1px solid var(--border);
+}
+
+.breakdown-token-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.breakdown-token-icon img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.breakdown-token-name {
+  font-weight: 700;
+  color: var(--text1);
+  width: 4rem;
+  flex-shrink: 0;
+}
+
+.breakdown-token-pct {
+  font-weight: 600;
+  color: var(--text2);
+  width: 3rem;
+  text-align: right;
+}
+
+.breakdown-token-ada {
+  font-weight: 600;
+  color: var(--text1);
+  flex: 1;
+  text-align: right;
+}
+
+.breakdown-token-usd {
+  font-size: 0.62rem;
+  color: var(--text3);
+  width: 4rem;
+  text-align: right;
+}
+
+/* ============================================================
+   POOL DEEP DIVE CARDS
+   ============================================================ */
+
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.pool-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pool-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.pool-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.pool-card-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text1);
+  flex: 1;
+}
+
+.pool-card-price {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.pool-card-body {
+  padding: 0.45rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pool-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+}
+
+.pool-metric-label {
+  flex: 0 0 5.5rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text3);
+}
+
+.pool-metric-val {
+  font-weight: 700;
+  color: var(--text1);
+  font-size: 0.75rem;
+}
+
+.pool-metric-sub {
+  font-size: 0.6rem;
+  color: var(--text3);
+  width: 100%;
+  padding-left: 5.75rem;
+  margin-top: -0.1rem;
+}
+
+/* ============================================================
+   RISK ANALYSIS
+   ============================================================ */
+
+.risk-ltv-section {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.risk-subtitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+  margin-bottom: 0.4rem;
+}
+
+.risk-ltv-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.risk-ltv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+
+.risk-ltv-label {
+  width: 3.5rem;
+  font-weight: 600;
+  color: var(--text2);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.risk-ltv-bar-track {
+  flex: 1;
+  height: 16px;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.risk-ltv-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.4s;
+}
+
+.risk-ltv-count {
+  width: 2rem;
+  font-weight: 700;
+  color: var(--text1);
+  text-align: right;
+}
+
+.risk-ltv-pct {
+  width: 3rem;
+  color: var(--text3);
+  text-align: right;
+}
+
+.risk-pool-table-wrap {
+  margin-top: 0.5rem;
+}
+
+.risk-pool-table-wrap .surf-table {
+  font-size: 0.7rem;
+}
+
+.risk-pool-table-wrap .surf-table th {
+  font-size: 0.62rem;
+}
+
+.risk-mini-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface);
+  margin-top: 2px;
+}
+
+.risk-mini-fill {
+  height: 100%;
+}
+
+.risk-mini-warn { background: var(--warning); }
+.risk-mini-liq  { background: var(--danger); }

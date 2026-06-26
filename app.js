@@ -1629,7 +1629,7 @@ function updateSurfUpdated() {
 async function renderSurfDashboard() {
   if (!surfData) return;
   const { pools, positions, summary } = surfData;
-  renderSurfSummary(summary);
+  renderSurfSummary(summary, pools, positions);
   renderSurfPoolFilter(pools);
   // pre-fetch token icons for all pool assets and position collaterals
   const uniqueAssets = new Set();
@@ -1648,6 +1648,8 @@ async function renderSurfDashboard() {
   renderSurfPoolApys(pools, summary);
   renderSurfPositions(positions, pools, summary);
   renderProtocolBreakdown(pools, positions, summary);
+  renderPoolDeepDive(pools, summary);
+  renderRiskAnalysis(positions, pools, summary);
 }
 
 function renderSurfPoolApys(pools, summary) {
@@ -1663,52 +1665,143 @@ function renderSurfPoolApys(pools, summary) {
   el.innerHTML = html;
 }
 
-function renderSurfSummary(summary) {
+function renderSurfSummary(summary, pools, positions) {
   const el = $('#analyticsSurfSummary');
   const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtShort = (v) => { if (v >= 1e12) return (v / 1e12).toFixed(2) + 'T'; if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B'; if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K'; return v.toFixed(2); };
+  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
   const adaPrice = summary.adaPrice || 1;
   const toADA = (usd) => usd / adaPrice;
+
+  const distinctBorrowers = new Set(positions.map(p => p.address)).size;
+  const totalBorrowADA = toADA(summary.totalBorrowedUSD);
+  const totalCollatADA = toADA(summary.totalCollateralUSD);
+  const totalSupplyADA = toADA(summary.totalSuppliedUSD);
+  const tvlADA = toADA(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD));
+  const borrowToSupply = totalSupplyADA > 0 ? totalBorrowADA / totalSupplyADA : 0;
+  const collatRatio = totalBorrowADA > 0 ? totalCollatADA / totalBorrowADA : 0;
+
+  const totalReserveADA = pools.reduce((s, p) => s + toADA((p.reserve || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice), 0);
+  const totalVolumeADA = pools.reduce((s, p) => s + (p.totalVolume || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1), 0);
+
+  let weightedBorrowApr = 0, weightedSupplyApy = 0, borrowWeight = 0, supplyWeight = 0;
+  for (const p of pools) {
+    const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
+    const sAda = toADA((p.totalSupplied || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
+    if (bAda > 0) { weightedBorrowApr += (p.borrowApr || 0) * bAda; borrowWeight += bAda; }
+    if (sAda > 0) { weightedSupplyApy += (p.supplyApyTotal || 0) * sAda; supplyWeight += sAda; }
+  }
+  const avgBorrowApr = borrowWeight > 0 ? weightedBorrowApr / borrowWeight : 0;
+  const avgSupplyApy = supplyWeight > 0 ? weightedSupplyApy / supplyWeight : 0;
+  const netInterestIncomeADA = totalBorrowADA * avgBorrowApr - totalSupplyADA * avgSupplyApy;
+
+  const ltvValues = positions.filter(p => p.ltv > 0).map(p => p.ltv);
+  const avgLtv = ltvValues.length > 0 ? ltvValues.reduce((s, v) => s + v, 0) / ltvValues.length : 0;
+  const healthy = positions.filter(p => p.ltv < 0.5).length;
+  const atRisk = positions.filter(p => p.ltv >= 0.5 && p.ltv < 0.75).length;
+  const liquidatable = positions.filter(p => p.ltv >= 0.75).length;
+
   el.innerHTML = `
-    <div class="summary-card">
+    <div class="summary-card summary-card-wide">
       <div class="summary-header">
         <img class="summary-header-icon" src="/img/surf.svg" alt="">
-        <h3>Protocol Summary</h3>
+        <h3>Protocol Overview</h3>
       </div>
-      <div class="summary-grid">
-        <div class="summary-stat">
-          <span class="summary-stat-label">Total Borrowed</span>
-          <span class="summary-stat-value">${fmtADA(toADA(summary.totalBorrowedUSD))}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.totalBorrowedUSD)}</span>
+      <div class="stats-bento">
+        <div class="bento-cell bento-cell-lg">
+          <div class="bento-label">Total Value Locked</div>
+          <div class="bento-value">${fmtADA(tvlADA)}</div>
+          <div class="bento-sub">${fmtUSD(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD))}</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">Total Collateral</span>
-          <span class="summary-stat-value">${fmtADA(toADA(summary.totalCollateralUSD))}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.totalCollateralUSD)}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Total Supplied</div>
+          <div class="bento-value">${fmtADA(totalSupplyADA)}</div>
+          <div class="bento-sub">${fmtUSD(summary.totalSuppliedUSD)}</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">Net Position Value</span>
-          <span class="summary-stat-value ${summary.totalNetValueUSD < 0 ? 'txt-danger' : 'txt-success'}">${fmtADA(toADA(summary.totalNetValueUSD))}</span>
-          <span class="summary-stat-sub ${summary.totalNetValueUSD < 0 ? 'txt-danger' : 'txt-success'}">${fmtUSD(summary.totalNetValueUSD)}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Total Borrowed</div>
+          <div class="bento-value">${fmtADA(totalBorrowADA)}</div>
+          <div class="bento-sub">${fmtUSD(summary.totalBorrowedUSD)}</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">Open Positions</span>
-          <span class="summary-stat-value">${summary.totalPositions}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Total Collateral</div>
+          <div class="bento-value">${fmtADA(totalCollatADA)}</div>
+          <div class="bento-sub">${fmtUSD(summary.totalCollateralUSD)}</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">SURF Price</span>
-          <span class="summary-stat-value">${fmtADA(summary.surfPrice)}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.surfPriceUSD)}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Borrow / Supply</div>
+          <div class="bento-value">${fmtPct(borrowToSupply)}</div>
+          <div class="bento-sub">Collateral / Borrow ${collatRatio.toFixed(2)}x</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">Total Supplied</span>
-          <span class="summary-stat-value">${fmtADA(toADA(summary.totalSuppliedUSD))}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.totalSuppliedUSD)}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Net Position Value</div>
+          <div class="bento-value ${summary.totalNetValueUSD < 0 ? 'bento-txt-danger' : 'bento-txt-success'}">${fmtADA(toADA(summary.totalNetValueUSD))}</div>
+          <div class="bento-sub">${fmtUSD(summary.totalNetValueUSD)}</div>
         </div>
-        <div class="summary-stat">
-          <span class="summary-stat-label">Total TVL</span>
-          <span class="summary-stat-value">${fmtADA(toADA(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD)))}</span>
-          <span class="summary-stat-sub">${fmtUSD(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD))}</span>
+        <div class="bento-cell">
+          <div class="bento-label">Active Borrowers</div>
+          <div class="bento-value">${distinctBorrowers}</div>
+          <div class="bento-sub">${summary.totalPositions} open positions</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Avg Loan Size</div>
+          <div class="bento-value">${distinctBorrowers > 0 ? fmtADA(totalBorrowADA / distinctBorrowers) : '—'}</div>
+          <div class="bento-sub">Across ${distinctBorrowers} borrowers</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Avg Collateral / Position</div>
+          <div class="bento-value">${summary.totalPositions > 0 ? fmtADA(totalCollatADA / summary.totalPositions) : '—'}</div>
+          <div class="bento-sub">${summary.totalPositions} positions</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Weighted Avg Borrow APR</div>
+          <div class="bento-value">${fmtPct(avgBorrowApr)}</div>
+          <div class="bento-sub">${borrowWeight > 0 ? borrowWeight.toFixed(2) + ' ADA at these rates' : ''}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Weighted Avg Supply APY</div>
+          <div class="bento-value bento-txt-success">${fmtPct(avgSupplyApy)}</div>
+          <div class="bento-sub">${supplyWeight > 0 ? supplyWeight.toFixed(2) + ' ADA earning yield' : ''}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Pool Count</div>
+          <div class="bento-value">${summary.totalPools}</div>
+          <div class="bento-sub">${pools.filter(p => p.collateralAssets.length > 0).length} borrow pools</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Total Reserve</div>
+          <div class="bento-value">${fmtADA(totalReserveADA)}</div>
+          <div class="bento-sub">${pools.reduce((s, p) => s + (p.reserveFactor || 0), 0) / pools.length > 0 ? fmtPct(pools.reduce((s, p) => s + (p.reserveFactor || 0), 0) / pools.length) + ' avg reserve factor' : ''}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">SURF Price</div>
+          <div class="bento-value">${fmtADA(summary.surfPrice)}</div>
+          <div class="bento-sub">${fmtUSD(summary.surfPriceUSD)}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">ADA Price</div>
+          <div class="bento-value">${fmtUSD(adaPrice)}</div>
+          <div class="bento-sub">1 ADA = $${adaPrice.toFixed(4)}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Net Interest Income (annualized)</div>
+          <div class="bento-value ${netInterestIncomeADA >= 0 ? 'bento-txt-success' : 'bento-txt-danger'}">${fmtADA(Math.abs(netInterestIncomeADA))}</div>
+          <div class="bento-sub">${netInterestIncomeADA >= 0 ? 'Protocol surplus' : 'Protocol deficit'}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Avg LTV</div>
+          <div class="bento-value">${fmtPct(avgLtv)}</div>
+          <div class="bento-sub">${healthy} healthy · ${atRisk} at risk · ${liquidatable} liquidatable</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Total Volume (all-time)</div>
+          <div class="bento-value">${fmtADA(totalVolumeADA)}</div>
+        </div>
+        <div class="bento-cell">
+          <div class="bento-label">Net Collateralization</div>
+          <div class="bento-value">${fmtADA(totalCollatADA - totalBorrowADA)}</div>
+          <div class="bento-sub">Buffer = ${collatRatio > 1 ? ((collatRatio - 1) * 100).toFixed(1) + '%' : 'Under-collateralized!'}</div>
         </div>
       </div>
     </div>
@@ -1716,8 +1809,8 @@ function renderSurfSummary(summary) {
 }
 
 function renderProtocolBreakdown(pools, positions, summary) {
-  const el = $('#analyticsSurfSummary');
-  if (!pools || pools.length === 0) return;
+  const el = $('#protocolBreakdownContainer');
+  if (!pools || pools.length === 0 || !el) return;
 
   const supplied = {};
   for (const p of pools) {
@@ -1747,46 +1840,221 @@ function renderProtocolBreakdown(pools, positions, summary) {
     if (pid && tokenLogoCache.has(pid)) iconMap[pos.principalTicker] = tokenLogoCache.get(pid);
   }
 
-  const totalADA = summary.adaPrice ? summary.totalTVLUSD / summary.adaPrice : 0;
+  const adaPrice = summary.adaPrice || 1;
   const fmtShortADA = (usd) => {
-    const ada = usd / (summary.adaPrice || 1);
+    const ada = usd / adaPrice;
     if (ada >= 1e6) return (ada / 1e6).toFixed(2) + 'M';
     if (ada >= 1e3) return (ada / 1e3).toFixed(2) + 'K';
     return ada.toFixed(0);
   };
+  const fmtShortUSD = (v) => { if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return '$' + (v / 1e3).toFixed(2) + 'K'; return '$' + v.toFixed(0); };
 
-  const barHtml = (data) => {
+  const barHtml = (data, label) => {
     const total = Object.values(data).reduce((s, v) => s + v, 0);
-    if (total <= 0 || totalADA <= 0) return '<div class="breakdown-bar"><span class="breakdown-bar-empty">—</span></div>';
+    if (total <= 0) return '<div class="breakdown-bar"><span class="breakdown-bar-empty">No ' + label.toLowerCase() + '</span></div>';
     const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    let html = '<div class="breakdown-bar">';
+    let rowHtml = '';
+    let barHtml = '<div class="breakdown-bar">';
     for (const [ticker, val] of sorted) {
       const pct = val / total;
       if (pct < 0.005) continue;
       const icon = iconMap[ticker] || '';
       const iconImg = icon ? `<img class="breakdown-icon" src="${icon}" alt="">` : '';
-      html += `<div class="breakdown-seg" style="flex:${Math.round(pct * 1000)}" title="${ticker}: ${fmtShortADA(val)} ADA (${(pct * 100).toFixed(1)}%)">${iconImg}<span class="breakdown-seg-label">${ticker}</span></div>`;
+      barHtml += `<div class="breakdown-seg" style="flex:${Math.round(pct * 1000)}" title="${ticker}: ${fmtShortADA(val)} ADA · ${fmtShortUSD(val)} (${(pct * 100).toFixed(1)}%)">${iconImg}<span class="breakdown-seg-label">${ticker}</span></div>`;
+      rowHtml += `<div class="breakdown-token-row"><span class="breakdown-token-icon">${iconImg}</span><span class="breakdown-token-name">${ticker}</span><span class="breakdown-token-pct">${(pct * 100).toFixed(1)}%</span><span class="breakdown-token-ada">${fmtShortADA(val)} ADA</span><span class="breakdown-token-usd">${fmtShortUSD(val)}</span></div>`;
     }
-    html += '</div>';
-    return html;
+    barHtml += '</div>';
+    return barHtml + rowHtml;
   };
 
-  el.innerHTML += `
-    <div class="protocol-breakdown">
-      <div class="breakdown-row">
-        <span class="breakdown-row-label">Supplied</span>
-        ${barHtml(supplied)}
+  el.innerHTML = `
+    <div class="summary-card summary-card-wide">
+      <div class="summary-header">
+        <h3>Token Distribution Breakdown</h3>
       </div>
-      <div class="breakdown-row">
-        <span class="breakdown-row-label">Collateral</span>
-        ${barHtml(collateral)}
-      </div>
-      <div class="breakdown-row">
-        <span class="breakdown-row-label">Borrowed</span>
-        ${barHtml(borrowed)}
+      <div class="breakdown-section">
+        <div class="breakdown-group">
+          <div class="breakdown-cat-label">Supplied <span class="breakdown-cat-total">${fmtShortADA(Object.values(supplied).reduce((s, v) => s + v, 0))} ADA</span></div>
+          ${barHtml(supplied, 'Supplied')}
+        </div>
+        <div class="breakdown-group">
+          <div class="breakdown-cat-label">Collateral <span class="breakdown-cat-total">${fmtShortADA(Object.values(collateral).reduce((s, v) => s + v, 0))} ADA</span></div>
+          ${barHtml(collateral, 'Collateral')}
+        </div>
+        <div class="breakdown-group">
+          <div class="breakdown-cat-label">Borrowed <span class="breakdown-cat-total">${fmtShortADA(Object.values(borrowed).reduce((s, v) => s + v, 0))} ADA</span></div>
+          ${barHtml(borrowed, 'Borrowed')}
+        </div>
       </div>
     </div>
   `;
+}
+
+function renderPoolDeepDive(pools, summary) {
+  const el = $('#poolDeepDiveContainer');
+  if (!pools || pools.length === 0 || !el) return;
+
+  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
+  const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const adaPrice = summary.adaPrice || 1;
+  const toADA = (usd) => usd / adaPrice;
+
+  let html = '<div class="summary-card summary-card-wide"><div class="summary-header"><h3>Pool Deep Dive</h3></div><div class="pool-grid">';
+
+  for (const p of pools) {
+    const decimals = p.asset.decimals || 0;
+    const suppliedADA = (p.totalSupplied || 0) / Math.pow(10, decimals) * (p.price || 1);
+    const borrowedADA = (p.totalBorrowed || 0) / Math.pow(10, decimals) * (p.price || 1);
+    const reserveADA = (p.reserve || 0) / Math.pow(10, decimals) * (p.price || 1);
+    const utilization = p.totalSupplied > 0 ? p.totalBorrowed / p.totalSupplied : 0;
+    const suppliedUSD = toADA(suppliedADA) * adaPrice;
+
+    const assetLogo = (!p.asset || !p.asset.policyId) ? TOKEN_LOGOS.ADA : (tokenLogoCache.get(p.asset.policyId + (p.asset.assetName || '')) || null);
+    const iconHtml = assetLogo ? `<img class="pool-icon" src="${assetLogo}" alt="">` : '';
+
+    const collatTickers = p.collateralAssets.length > 0 ? p.collateralAssets.map(c => c.ticker).join(' + ') : '—';
+
+    html += `
+      <div class="pool-card">
+        <div class="pool-card-header">
+          ${iconHtml}
+          <span class="pool-card-title">${escHtml(p.asset.ticker)}</span>
+          <span class="pool-card-price">${fmtADA(p.price || 1)}</span>
+        </div>
+        <div class="pool-card-body">
+          <div class="pool-metric">
+            <span class="pool-metric-label">Supply APY</span>
+            <span class="pool-metric-val">${fmtPct(p.supplyApy)}</span>
+            <span class="pool-metric-sub">+ adj ${fmtPct(p.supplyApyAdjustment)} = ${fmtPct(p.supplyApyTotal)} total</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Borrow APR</span>
+            <span class="pool-metric-val">${fmtPct(p.borrowApr)}</span>
+            <span class="pool-metric-sub">Spread ${fmtPct(p.borrowApr - p.supplyApyTotal)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Utilization</span>
+            <span class="pool-metric-val">${fmtPct(utilization)}</span>
+            <span class="pool-metric-sub">${borrowedADA > 0 ? borrowedADA.toFixed(2) + ' / ' + suppliedADA.toFixed(2) : '0 / ' + suppliedADA.toFixed(2)} ADA</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Total Supplied</span>
+            <span class="pool-metric-val">${fmtADA(suppliedADA)}</span>
+            <span class="pool-metric-sub">${fmtUSD(suppliedUSD)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Total Borrowed</span>
+            <span class="pool-metric-val">${fmtADA(borrowedADA)}</span>
+            <span class="pool-metric-sub">${borrowedADA > 0 ? fmtUSD(borrowedADA * adaPrice) : '—'}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Reserve</span>
+            <span class="pool-metric-val">${fmtADA(reserveADA)}</span>
+            <span class="pool-metric-sub">Reserve factor ${fmtPct(p.reserveFactor)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Historical APY</span>
+            <span class="pool-metric-val">${fmtPct(p.historicalApy || 0)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">LTV Thresholds</span>
+            <span class="pool-metric-val">Max ${fmtPct(p.maxBorrowLTV)}</span>
+            <span class="pool-metric-sub">Liq ${fmtPct(p.liquidationThresholdLTV)} · Rec ${fmtPct(p.recommendedBorrowLTV)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Collateral Assets</span>
+            <span class="pool-metric-val">${escHtml(collatTickers)}</span>
+          </div>
+          <div class="pool-metric">
+            <span class="pool-metric-label">Total Volume</span>
+            <span class="pool-metric-val">${fmtADA(p.totalVolume || 0)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+function renderRiskAnalysis(positions, pools, summary) {
+  const el = $('#riskAnalysisContainer');
+  if (!el) return;
+
+  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
+  const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtUSD = (v) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const adaPrice = summary.adaPrice || 1;
+  const toADA = (usd) => usd / adaPrice;
+
+  const healthy = positions.filter(p => p.ltv < 0.5);
+  const atRisk = positions.filter(p => p.ltv >= 0.5 && p.ltv < 0.75);
+  const liq = positions.filter(p => p.ltv >= 0.75);
+
+  const healthyValADA = healthy.reduce((s, p) => s + p.netValueUSD, 0) / adaPrice;
+  const atRiskValADA = atRisk.reduce((s, p) => s + p.netValueUSD, 0) / adaPrice;
+  const liqValADA = liq.reduce((s, p) => s + p.netValueUSD, 0) / adaPrice;
+  const totalPos = positions.length || 1;
+
+  const ltvBuckets = { '0-25%': 0, '25-50%': 0, '50-75%': 0, '75%+': 0 };
+  for (const p of positions) {
+    if (p.ltv < 0.25) ltvBuckets['0-25%']++;
+    else if (p.ltv < 0.5) ltvBuckets['25-50%']++;
+    else if (p.ltv < 0.75) ltvBuckets['50-75%']++;
+    else ltvBuckets['75%+']++;
+  }
+
+  const liqValues = positions.filter(p => p.ltv > 0).map(p => {
+    const pool = pools.find(po => po.poolId === p.poolId);
+    const threshold = pool?.liquidationThresholdLTV || 0.8;
+    return { addr: p.address, currentLtv: p.ltv, threshold, distanceToLiq: threshold - p.ltv };
+  });
+
+  const closeToLiq = liqValues.filter(p => p.distanceToLiq < 0.1 && p.distanceToLiq >= 0).length;
+
+  const poolRisk = {};
+  for (const p of positions) {
+    const ticker = pools.find(po => po.poolId === p.poolId)?.asset.ticker || '?';
+    if (!poolRisk[ticker]) poolRisk[ticker] = { total: 0, liquidatable: 0, atRisk: 0, valueADA: 0 };
+    poolRisk[ticker].total++;
+    poolRisk[ticker].valueADA += p.totalOwedUSD / adaPrice;
+    if (p.ltv >= 0.75) poolRisk[ticker].liquidatable++;
+    else if (p.ltv >= 0.5) poolRisk[ticker].atRisk++;
+  }
+
+  const avgLiqThreshold = positions.reduce((s, p) => {
+    const pool = pools.find(po => po.poolId === p.poolId);
+    return s + (pool?.liquidationThresholdLTV || 0.8);
+  }, 0) / totalPos;
+
+  let html = '<div class="summary-card summary-card-wide"><div class="summary-header"><h3>Risk Analysis</h3></div>';
+
+  html += '<div class="stats-bento">';
+  html += `<div class="bento-cell bento-txt-ok"><div class="bento-label">Healthy Positions</div><div class="bento-value">${healthy.length}</div><div class="bento-sub">${fmtADA(healthyValADA)} net value</div></div>`;
+  html += `<div class="bento-cell bento-txt-warning"><div class="bento-label">At Risk (LTV 50-75%)</div><div class="bento-value">${atRisk.length}</div><div class="bento-sub">${fmtADA(atRiskValADA)} net value</div></div>`;
+  html += `<div class="bento-cell bento-txt-danger"><div class="bento-label">Liquidatable (LTV >75%)</div><div class="bento-value">${liq.length}</div><div class="bento-sub">${fmtADA(liqValADA)} net value</div></div>`;
+  html += `<div class="bento-cell"><div class="bento-label">Avg Liquidation Threshold</div><div class="bento-value">${fmtPct(avgLiqThreshold)}</div><div class="bento-sub">Positions within 10% of liq: ${closeToLiq}</div></div>`;
+  html += '</div>';
+
+  html += '<div class="risk-ltv-section"><div class="risk-subtitle">LTV Distribution</div><div class="risk-ltv-bars">';
+  for (const [bucket, count] of Object.entries(ltvBuckets)) {
+    const pct = count / totalPos * 100;
+    const barColor = bucket === '0-25%' ? '#22c55e' : bucket === '25-50%' ? '#3b82f6' : bucket === '50-75%' ? '#f59e0b' : '#ef4444';
+    html += `<div class="risk-ltv-row"><span class="risk-ltv-label">${bucket}</span><div class="risk-ltv-bar-track"><div class="risk-ltv-bar-fill" style="width:${pct}%;background:${barColor}"></div></div><span class="risk-ltv-count">${count}</span><span class="risk-ltv-pct">(${(pct).toFixed(1)}%)</span></div>`;
+  }
+  html += '</div></div>';
+
+  html += '<div class="risk-pool-table-wrap"><div class="risk-subtitle">Risk by Pool</div><table class="surf-table"><thead><tr><th>Pool</th><th>Positions</th><th>At Risk</th><th>Liquidatable</th><th>Loan Value (ADA)</th></tr></thead><tbody>';
+  for (const [ticker, r] of Object.entries(poolRisk).sort((a, b) => b[1].total - a[1].total)) {
+    const atRiskBar = r.total > 0 ? '<div class="risk-mini-bar"><div class="risk-mini-fill risk-mini-warn" style="width:' + (r.atRisk / r.total * 100) + '%"></div><div class="risk-mini-fill risk-mini-liq" style="width:' + (r.liquidatable / r.total * 100) + '%"></div></div>' : '';
+    html += `<tr><td><strong>${escHtml(ticker)}</strong></td><td>${r.total}</td><td>${r.atRisk}</td><td>${r.liquidatable}</td><td>${fmtADA(r.valueADA)}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function renderSurfPoolFilter(pools) {
@@ -2191,6 +2459,60 @@ async function renderAnalytics() {
     if (surfData?.staking?.rewardsChart) {
       renderStakingChart(surfData.staking.rewardsChart);
     }
+
+    // 24h deltas from earliest available snapshot
+    (function updateDeltas(snapshots) {
+      if (!snapshots || snapshots.length < 2) return;
+      const latest = snapshots[snapshots.length - 1];
+      const target = Date.now() - 86400000;
+      let closest = snapshots[0];
+      for (const s of snapshots) {
+        const t = new Date(s.snapshot_at).getTime();
+        if (Math.abs(t - target) < Math.abs(new Date(closest.snapshot_at).getTime() - target)) closest = s;
+      }
+      if (closest === latest) return;
+      const deltaPct = (cur, prev) => prev > 0 ? ((cur - prev) / prev * 100).toFixed(2) : null;
+      const supplied = latest.total_supplied_usd || 0;
+      const borrowed = latest.total_borrowed_usd || 0;
+      const collateral = latest.total_collateral_usd || 0;
+      const supPrev = closest.total_supplied_usd || 0;
+      const borPrev = closest.total_borrowed_usd || 0;
+      const colPrev = closest.total_collateral_usd || 0;
+      const tokens = document.querySelectorAll('.bento-cell');
+      for (const t of tokens) {
+        const label = t.querySelector('.bento-label')?.textContent || '';
+        if (label === 'Total Value Locked') {
+          const tvl = (supplied + collateral - borrowed);
+          const tvlPrev = (supPrev + colPrev - borPrev);
+          const d = deltaPct(tvl, tvlPrev);
+          if (d) {
+            const sub = t.querySelector('.bento-sub');
+            if (sub) sub.textContent = (d >= 0 ? '+' : '') + d + '% (24h)';
+          }
+        }
+        if (label === 'Total Supplied') {
+          const d = deltaPct(supplied, supPrev);
+          if (d) {
+            const sub = t.querySelector('.bento-sub');
+            if (sub) sub.textContent = (d >= 0 ? '+' : '') + d + '% (24h)';
+          }
+        }
+        if (label === 'Total Borrowed') {
+          const d = deltaPct(borrowed, borPrev);
+          if (d) {
+            const sub = t.querySelector('.bento-sub');
+            if (sub) sub.textContent = (d >= 0 ? '+' : '') + d + '% (24h)';
+          }
+        }
+        if (label === 'Total Collateral') {
+          const d = deltaPct(collateral, colPrev);
+          if (d) {
+            const sub = t.querySelector('.bento-sub');
+            if (sub) sub.textContent = (d >= 0 ? '+' : '') + d + '% (24h)';
+          }
+        }
+      }
+    })(data.snapshots);
   } catch (e) {
     container.style.display = 'none'; empty.style.display = '';
     empty.querySelector('p').textContent = 'Error: ' + e.message;
