@@ -1689,8 +1689,8 @@ function renderSurfSummary(summary, pools, positions) {
 
   const netInterestIncomeADA = pools.reduce((sum, p) => {
     const bAda = toADA((p.totalBorrowed || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
-    const sAda = toADA((p.totalSupplied || 0) / Math.pow(10, p.asset.decimals || 0) * (p.price || 1) * adaPrice);
-    return sum + bAda * (p.borrowApr || 0) - sAda * (p.supplyApy || 0);
+    const rf = p.reserveFactor || 0;
+    return sum + bAda * (p.borrowApr || 0) * rf;
   }, 0);
   let weightedBorrowApr = 0, weightedSupplyApy = 0, borrowWeight = 0, supplyWeight = 0;
   for (const p of pools) {
