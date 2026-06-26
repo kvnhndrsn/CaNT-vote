@@ -2057,6 +2057,91 @@ function renderRiskAnalysis(positions, pools, summary) {
   el.innerHTML = html;
 }
 
+function renderPositionHealthBar() {
+  const wrap = $('#healthBarWrap');
+  if (!wrap || !surfData?.positions) return;
+  const positions = surfData.positions;
+  const adaPrice = surfData.summary.adaPrice || 1;
+
+  const healthy = positions.filter(p => p.ltv < 0.5);
+  const atRisk = positions.filter(p => p.ltv >= 0.5 && p.ltv < 0.75);
+  const liq = positions.filter(p => p.ltv >= 0.75);
+
+  const healthyVal = healthy.reduce((s, p) => s + p.totalOwedUSD, 0) / adaPrice;
+  const atRiskVal = atRisk.reduce((s, p) => s + p.totalOwedUSD, 0) / adaPrice;
+  const liqVal = liq.reduce((s, p) => s + p.totalOwedUSD, 0) / adaPrice;
+  const totalVal = healthyVal + atRiskVal + liqVal || 1;
+
+  const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtShort = (v) => { if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K'; return v.toFixed(2); };
+
+  wrap.innerHTML = `
+    <div class="stacked-bar-section">
+      <div class="stacked-bar-track">
+        <div class="stacked-bar-seg seg-healthy" style="flex:${healthyVal / totalVal * 1000}" title="${healthy.length} healthy · ${fmtShort(healthyVal)} ADA"></div>
+        <div class="stacked-bar-seg seg-atrisk" style="flex:${atRiskVal / totalVal * 1000}" title="${atRisk.length} at risk · ${fmtShort(atRiskVal)} ADA"></div>
+        <div class="stacked-bar-seg seg-liquidatable" style="flex:${liqVal / totalVal * 1000}" title="${liq.length} liquidatable · ${fmtShort(liqVal)} ADA"></div>
+      </div>
+      <div class="stacked-bar-legend">
+        <span class="stacked-bar-legend-item"><span class="legend-dot dot-healthy"></span> Healthy <strong>${healthy.length}</strong> <span class="legend-val">${fmtShort(healthyVal)} ADA</span></span>
+        <span class="stacked-bar-legend-item"><span class="legend-dot dot-atrisk"></span> At Risk <strong>${atRisk.length}</strong> <span class="legend-val">${fmtShort(atRiskVal)} ADA</span></span>
+        <span class="stacked-bar-legend-item"><span class="legend-dot dot-liquidatable"></span> Liquidatable <strong>${liq.length}</strong> <span class="legend-val">${fmtShort(liqVal)} ADA</span></span>
+      </div>
+    </div>
+  `;
+}
+
+function renderTvlCompositionBar() {
+  const wrap = $('#tvlBarWrap');
+  if (!wrap || !surfData) return;
+  const { pools, positions, summary } = surfData;
+  const adaPrice = summary.adaPrice || 1;
+
+  const suppliedADA = summary.totalSuppliedUSD / adaPrice;
+  const collateralADA = summary.totalCollateralUSD / adaPrice;
+  const borrowedADA = summary.totalBorrowedUSD / adaPrice;
+  const tvlADA = (summary.totalTVLUSD ?? (suppliedADA + collateralADA - borrowedADA) * adaPrice) / adaPrice;
+
+  const maxVal = Math.max(suppliedADA, collateralADA, tvlADA) || 1;
+  const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtShort = (v) => { if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K'; return v.toFixed(2); };
+
+  const pctOfTVL = (v) => tvlADA > 0 ? (v / tvlADA * 100).toFixed(1) + '%' : '—';
+
+  const bars = [
+    { label: 'Supplied', val: suppliedADA, color: '#3b82f6', desc: 'Supply pool deposits' },
+    { label: 'Collateral', val: collateralADA, color: '#8b5cf6', desc: 'Collateral for loans' },
+    { label: 'Borrowed', val: borrowedADA, color: '#ef4444', desc: 'Outstanding loans (subtracted)', negative: true },
+  ];
+
+  wrap.innerHTML = `
+    <div class="stacked-bar-section">
+      <div class="tvl-bar-list">
+        ${bars.map(b => {
+          const pct = b.val / maxVal * 100;
+          const barColor = b.negative ? 'tvl-bar-negative' : '';
+          return `<div class="tvl-bar-row">
+            <span class="tvl-bar-label">${b.label}</span>
+            <div class="tvl-bar-track">
+              <div class="tvl-bar-fill ${barColor}" style="width:${pct}%;background:${b.color}"></div>
+            </div>
+            <span class="tvl-bar-ada">${b.negative ? '- ' : ''}${fmtShort(b.val)}</span>
+            <span class="tvl-bar-pct">${pctOfTVL(b.val)}</span>
+          </div>`;
+        }).join('')}
+        <div class="tvl-bar-row tvl-bar-result">
+          <span class="tvl-bar-label">Net TVL</span>
+          <div class="tvl-bar-track">
+            <div class="tvl-bar-fill tvl-bar-net" style="width:${tvlADA / maxVal * 100}%"></div>
+          </div>
+          <span class="tvl-bar-ada tvl-bar-ada-result">${fmtShort(tvlADA)}</span>
+          <span class="tvl-bar-pct">100%</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderSurfPoolFilter(pools) {
   const sel = $('#surfPoolFilter');
   const current = sel.value;
@@ -2370,20 +2455,11 @@ async function renderAnalytics() {
       options: { ...base(), scales: { x: xAxis(), y: yAxis(moneyTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
     });
 
-    // 2 — Position Health (USD value)
-    mkChart(document.querySelector('#chartHealth canvas'), {
-      type: 'line',
-      data: sci([
-        { label: 'Healthy', data: snap.map(s => toUnit(s.healthy_value_usd || 0, s.ada_price)), borderColor: C.green, backgroundColor: C.green + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'At Risk', data: snap.map(s => toUnit(s.at_risk_value_usd || 0, s.ada_price)), borderColor: C.amber, backgroundColor: C.amber + '18', fill: true, tension: 0.3, pointRadius: 0 },
-        { label: 'Liquidatable', data: snap.map(s => toUnit(s.liquidatable_value_usd || 0, s.ada_price)), borderColor: C.red, backgroundColor: C.red + '18', fill: true, tension: 0.3, pointRadius: 0 },
-      ]),
-      options: {
-        ...base(),
-        scales: { x: xAxis(), y: yAxis(moneyTick) },
-        plugins: { legend: { ...lo(C.text), position: 'bottom' } },
-      },
-    });
+    // 2 — Position Health stacked bar
+    renderPositionHealthBar();
+
+    // 2b — TVL Composition stacked bar
+    renderTvlCompositionBar();
 
     // 3 — Prices
     if (isAda) {
