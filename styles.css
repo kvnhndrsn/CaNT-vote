@@ -1049,6 +1049,13 @@ select.surf-input {
   height: 200px;
 }
 
+.analytics-chart-wrap#revenueBreakdownWrap,
+.analytics-chart-wrap#tvlBarWrap,
+.analytics-chart-wrap#healthBarWrap {
+  height: auto;
+  min-height: 120px;
+}
+
 .analytics-chart-wrap canvas {
   width: 100% !important;
   height: 100% !important;
