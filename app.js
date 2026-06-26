@@ -1647,6 +1647,7 @@ async function renderSurfDashboard() {
   await prefetchHandles(positions.map(p => p.address));
   renderSurfPoolApys(pools, summary);
   renderSurfPositions(positions, pools, summary);
+  renderProtocolBreakdown(pools, positions, summary);
 }
 
 function renderSurfPoolApys(pools, summary) {
@@ -1709,6 +1710,80 @@ function renderSurfSummary(summary) {
           <span class="summary-stat-value">${fmtADA(toADA(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD)))}</span>
           <span class="summary-stat-sub">${fmtUSD(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD))}</span>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderProtocolBreakdown(pools, positions, summary) {
+  const el = $('#analyticsSurfSummary');
+  if (!pools || pools.length === 0) return;
+
+  const supplied = {};
+  for (const p of pools) {
+    const ticker = p.asset.ticker;
+    if (p.totalSuppliedUSD > 0) supplied[ticker] = (supplied[ticker] || 0) + p.totalSuppliedUSD;
+  }
+
+  const collateral = {};
+  const borrowed = {};
+  for (const pos of positions) {
+    const ct = pos.collateralTicker;
+    if (pos.collateralValueUSD > 0) collateral[ct] = (collateral[ct] || 0) + pos.collateralValueUSD;
+    const pt = pos.principalTicker;
+    if (pos.totalOwedUSD > 0) borrowed[pt] = (borrowed[pt] || 0) + pos.totalOwedUSD;
+  }
+
+  const iconMap = { ADA: TOKEN_LOGOS.ADA };
+  for (const p of pools) {
+    const asset = p.asset;
+    const logo = (!asset || !asset.policyId) ? TOKEN_LOGOS.ADA : (tokenLogoCache.get(asset.policyId + (asset.assetName || '')) || null);
+    if (logo) iconMap[p.asset.ticker] = logo;
+  }
+  for (const pos of positions) {
+    const cid = pos.collateralPolicyId + pos.collateralAssetName;
+    if (cid && tokenLogoCache.has(cid)) iconMap[pos.collateralTicker] = tokenLogoCache.get(cid);
+    const pid = pos.principalPolicyId + pos.principalAssetName;
+    if (pid && tokenLogoCache.has(pid)) iconMap[pos.principalTicker] = tokenLogoCache.get(pid);
+  }
+
+  const totalADA = summary.adaPrice ? summary.totalTVLUSD / summary.adaPrice : 0;
+  const fmtShortADA = (usd) => {
+    const ada = usd / (summary.adaPrice || 1);
+    if (ada >= 1e6) return (ada / 1e6).toFixed(2) + 'M';
+    if (ada >= 1e3) return (ada / 1e3).toFixed(2) + 'K';
+    return ada.toFixed(0);
+  };
+
+  const barHtml = (data) => {
+    const total = Object.values(data).reduce((s, v) => s + v, 0);
+    if (total <= 0 || totalADA <= 0) return '<div class="breakdown-bar"><span class="breakdown-bar-empty">—</span></div>';
+    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    let html = '<div class="breakdown-bar">';
+    for (const [ticker, val] of sorted) {
+      const pct = val / total;
+      if (pct < 0.005) continue;
+      const icon = iconMap[ticker] || '';
+      const iconImg = icon ? `<img class="breakdown-icon" src="${icon}" alt="">` : '';
+      html += `<div class="breakdown-seg" style="flex:${Math.round(pct * 1000)}" title="${ticker}: ${fmtShortADA(val)} ADA (${(pct * 100).toFixed(1)}%)">${iconImg}<span class="breakdown-seg-label">${ticker}</span></div>`;
+    }
+    html += '</div>';
+    return html;
+  };
+
+  el.innerHTML += `
+    <div class="protocol-breakdown">
+      <div class="breakdown-row">
+        <span class="breakdown-row-label">Supplied</span>
+        ${barHtml(supplied)}
+      </div>
+      <div class="breakdown-row">
+        <span class="breakdown-row-label">Collateral</span>
+        ${barHtml(collateral)}
+      </div>
+      <div class="breakdown-row">
+        <span class="breakdown-row-label">Borrowed</span>
+        ${barHtml(borrowed)}
       </div>
     </div>
   `;
