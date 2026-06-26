@@ -23,6 +23,8 @@ function formatToken(val) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page) || 50));

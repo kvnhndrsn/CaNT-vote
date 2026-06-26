@@ -38,6 +38,14 @@ const CURATED_TOKENS = [
   { label: 'SURF',  policy: '2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80', asset: '464c4f57', fingerprint: '' },
 ];
 
+let Chart = null;
+
+async function ensureChart() {
+  if (Chart) return;
+  const mod = await import('https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js');
+  Chart = mod.default || mod.Chart || mod;
+}
+
 const POLL_COLORS = [
   '#22c55e', '#ef4444', '#3b82f6', '#f59e0b',
   '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
@@ -1521,7 +1529,7 @@ $$('.tab').forEach(tab => {
     if (view === 'surf' || view === 'analytics') {
       await fetchSurfDashboard();
       if (surfRefreshInterval) clearInterval(surfRefreshInterval);
-      surfRefreshInterval = setInterval(fetchSurfDashboard, 60000);
+      surfRefreshInterval = setInterval(fetchSurfDashboard, 120000);
       if (surfTickInterval) clearInterval(surfTickInterval);
       surfTickInterval = setInterval(updateSurfUpdated, 10000);
     } else {
@@ -1540,7 +1548,7 @@ $$('.tab').forEach(tab => {
     if (view === 'activity') {
       fetchActivity();
       if (activityInterval) clearInterval(activityInterval);
-      activityInterval = setInterval(fetchActivity, 30000);
+      activityInterval = setInterval(fetchActivity, 60000);
     } else {
       if (activityInterval) {
         clearInterval(activityInterval);
@@ -1623,7 +1631,21 @@ async function renderSurfDashboard() {
   }
   await Promise.all([...uniqueAssets].map(fetchTokenIcon));
   await prefetchHandles(positions.map(p => p.address));
+  renderSurfPoolApys(pools, summary);
   renderSurfPositions(positions, pools, summary);
+}
+
+function renderSurfPoolApys(pools, summary) {
+  const el = $('#poolApyBreakdown');
+  if (!el || !pools || pools.length === 0) return;
+  const fmtPct = (v) => (v * 100).toFixed(2) + '%';
+  let html = '<div class="summary-card" style="margin-top:0.5rem"><div class="summary-header"><h3>Pool Supply APY Breakdown</h3></div><div class="pool-apy-table-wrap"><table class="pool-apy-table"><thead><tr><th>Pool</th><th>Supply APY</th><th>Adjustment</th><th>Total APY</th></tr></thead><tbody>';
+  for (const p of pools) {
+    const label = p.asset.ticker + (p.collateralAssets.length > 0 ? '/' + p.collateralAssets[0].ticker : '');
+    html += `<tr><td>${escHtml(label)}</td><td>${fmtPct(p.supplyApy)}</td><td>${fmtPct(p.supplyApyAdjustment)}</td><td><strong>${fmtPct(p.supplyApyTotal)}</strong></td></tr>`;
+  }
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
 }
 
 function renderSurfSummary(summary) {
@@ -1877,6 +1899,9 @@ $('#surfStatusFilter')?.addEventListener('change', (e) => {
 let analyticsCharts = [];
 let analyticsDays = 7;
 let analyticsUnit = 'usd';
+let graphCache = null;
+let graphCacheKey = '';
+let graphCacheTime = 0;
 
 function destroyAnalyticsCharts() {
   for (const c of analyticsCharts) { if (c) c.destroy(); }
@@ -1895,15 +1920,27 @@ function analyticsThemeColors() {
 }
 
 async function renderAnalytics() {
+  await ensureChart();
+  if (!Chart) return;
   const container = $('#analyticsContent');
   const empty = $('#analyticsEmpty');
 
   try {
     const days = analyticsDays > 0 ? analyticsDays : 3650;
-    const from = new Date(Date.now() - days * 86400000).toISOString();
-    const res = await fetch('/api/graph?type=protocol&from=' + encodeURIComponent(from));
-    if (!res.ok) throw new Error((await res.json()).error);
-    const data = await res.json();
+    const key = days + '-' + analyticsUnit;
+    const now = Date.now();
+    let data = null;
+    if (graphCacheKey === key && graphCache && (now - graphCacheTime) < 300000) {
+      data = graphCache;
+    } else {
+      const from = new Date(Date.now() - days * 86400000).toISOString();
+      const res = await fetch('/api/graph?type=protocol&from=' + encodeURIComponent(from));
+      if (!res.ok) throw new Error((await res.json()).error);
+      data = await res.json();
+      graphCache = data;
+      graphCacheKey = key;
+      graphCacheTime = now;
+    }
 
     if (!data.snapshots || data.snapshots.length < 1) {
       container.style.display = 'none'; empty.style.display = '';
@@ -1953,6 +1990,7 @@ async function renderAnalytics() {
     const numTick = (v) => v.toFixed(0);
 
     function mkChart(el, config) {
+      if (!Chart) return null;
       const c = new Chart(el, config);
       analyticsCharts.push(c);
       return c;
@@ -2084,23 +2122,31 @@ function renderStakingStats() {
   const lastDist = info.lastRewardsDistributionDate
     ? new Date(info.lastRewardsDistributionDate).toLocaleDateString()
     : '--';
+  const periodDays = info.stakingPeriodInDays || 15;
+  const activeStakePct = info.activeStakingShare != null ? (info.activeStakingShare * 100).toFixed(1) : null;
+  const liveStakePct = info.liveStakingShare != null ? (info.liveStakingShare * 100).toFixed(1) : null;
 
   el.innerHTML = `
     <div class="staking-card">
       <div class="staking-header">
         <img src="/img/surf.svg" alt="">
-        <h3>SURF Staking</h3>
+        <h3>SURF Staking  <span class="tooltip">${periodDays}-day period</span></h3>
       </div>
       <div class="staking-grid">
         <div class="staking-stat">
-          <div class="staking-stat-label">Total Staked</div>
+          <div class="staking-stat-label">Total Live Staked</div>
           <div class="staking-stat-value">${fmtExact(info.totalLiveStake)} SURF</div>
-          <div class="staking-stat-sub">${(info.liveStakedCirculatingSupply * 100).toFixed(1)}% of circ</div>
+          <div class="staking-stat-sub">${(info.liveStakedCirculatingSupply * 100).toFixed(1)}% of circ · ${liveStakePct ? liveStakePct + '% live' : ''}</div>
+        </div>
+        <div class="staking-stat">
+          <div class="staking-stat-label">Total Active Staked</div>
+          <div class="staking-stat-value">${fmtExact(info.totalActiveStake)} SURF</div>
+          <div class="staking-stat-sub">${activeStakePct ? activeStakePct + '% active' : ''}</div>
         </div>
         <div class="staking-stat">
           <div class="staking-stat-label">Stakers</div>
           <div class="staking-stat-value">${info.totalStakeLiveUniqueStakers}</div>
-          <div class="staking-stat-sub">${info.totalStakeUniqueStakers} active</div>
+          <div class="staking-stat-sub">${info.totalStakeUniqueStakers} this period</div>
         </div>
         <div class="staking-stat">
           <div class="staking-stat-label">Period APY</div>
@@ -2108,7 +2154,7 @@ function renderStakingStats() {
           <div class="staking-stat-sub">Aggregated: ${(apy.aggregatedApy || 0).toFixed(2)}%</div>
         </div>
         <div class="staking-stat">
-          <div class="staking-stat-label">Distributed</div>
+          <div class="staking-stat-label">All Time Distributed</div>
           <div class="staking-stat-value">${fmtExact(info.totalDistributedRewards)} ADA</div>
         </div>
       </div>
@@ -2138,6 +2184,7 @@ function renderStakingChart(snapshots) {
   const canvas = document.querySelector('#chartStakingRewards canvas');
   if (!canvas || !snapshots || snapshots.length < 2) return;
   if (stakingChart) { stakingChart.destroy(); stakingChart = null; }
+  if (!Chart) return;
 
   const C = analyticsThemeColors();
   const labels = snapshots.map(s => {
@@ -2158,6 +2205,7 @@ function renderStakingChart(snapshots) {
           borderWidth: 1,
           borderRadius: 3,
           yAxisID: 'y',
+          order: 1,
         },
         {
           label: 'Stakers',
@@ -2168,6 +2216,18 @@ function renderStakingChart(snapshots) {
           tension: 0.3,
           type: 'line',
           yAxisID: 'y1',
+          order: 1,
+        },
+        {
+          label: 'APY',
+          data: snapshots.map(s => s.apy || s.aggregatedApy || 0),
+          borderColor: C.green,
+          borderDash: [3, 3],
+          pointRadius: 0,
+          tension: 0.3,
+          type: 'line',
+          yAxisID: 'y2',
+          order: 0,
         },
       ],
     },
@@ -2186,6 +2246,7 @@ function renderStakingChart(snapshots) {
         x: { grid: { color: C.grid, tickLength: 4 }, ticks: { color: C.text, maxTicksLimit: 10, font: { size: 9 } } },
         y: { grid: { color: C.grid }, position: 'left', title: { display: true, text: 'SURF Rewards', color: C.text3, font: { size: 9 } }, ticks: { color: C.text, font: { size: 9 }, callback: (v) => v >= 1e3 ? (v / 1e3).toFixed(0) + 'M' : v.toFixed(0) } },
         y1: { grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'Stakers', color: C.text3, font: { size: 9 } }, ticks: { color: C.text, font: { size: 9 } } },
+        y2: { grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'APY %', color: C.green, font: { size: 9 } }, ticks: { color: C.text, font: { size: 9 }, callback: (v) => v.toFixed(1) + '%' } },
       },
     },
   });

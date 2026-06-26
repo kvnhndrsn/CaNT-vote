@@ -930,6 +930,39 @@ select.surf-input {
   }
 }
 
+/* ---------- Pool APY Breakdown ---------- */
+
+.pool-apy-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.pool-apy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.pool-apy-table th {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text3);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pool-apy-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.pool-apy-table tbody tr:hover {
+  background: var(--surface2);
+}
+
 /* ---------- SURF Analytics ---------- */
 
 .analytics-header {

@@ -24,6 +24,10 @@ function parseAssetId(key) {
 
 export default async function handler(req, res) {
   const { address } = req.query;
+  res.setHeader('Content-Type', 'application/json');
+  if (!address) {
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+  }
 
   try {
     const [poolData, posData, surfPriceData, adaPriceData, stakingInfo, stakingApy, stakingChart] = await Promise.all([
@@ -31,9 +35,9 @@ export default async function handler(req, res) {
       surfFetch('/api/getAllPositions' + (address ? `?address=${encodeURIComponent(address)}` : '')),
       surfFetch('/api/getSurfPrice'),
       surfFetch('/api/getAdaPrice'),
-      surfFetch('/api/staking/getInfo'),
+      surfFetch('/api/staking/getInfo' + (address ? `?address=${encodeURIComponent(address)}` : '')),
       surfFetch('/api/staking/getAPY'),
-      surfFetch('/api/staking/getRewardsChart'),
+      surfFetch('/api/staking/getRewardsChart' + (address ? `?address=${encodeURIComponent(address)}` : '')),
     ]);
 
     if (!poolData) {
@@ -66,6 +70,8 @@ export default async function handler(req, res) {
         reserve: info.reserve || 0,
         reserveFactor: info.reserveFactor || 0,
         supplyApy: info.supplyApy || 0,
+        supplyApyAdjustment: info.supplyApyAdjustment || 0,
+        supplyApyTotal: (info.supplyApy || 0) + (info.supplyApyAdjustment || 0),
         borrowApr: info.borrowApr || 0,
         totalCToken: info.totalCToken || 0,
         totalUnpaidInterest: info.totalUnpaidInterest || 0,
