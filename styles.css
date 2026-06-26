@@ -1798,6 +1798,20 @@ select.surf-input {
   width: 20px;
   height: 20px;
   border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+
+.pool-icon-pile {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.pool-icon-pile .pool-icon {
+  margin-right: -8px;
+}
+
+.pool-icon-pile .pool-icon:last-child {
+  margin-right: 0;
 }
 
 .pool-card-title {

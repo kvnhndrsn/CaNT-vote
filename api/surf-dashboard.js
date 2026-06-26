@@ -250,17 +250,25 @@ export default async function handler(req, res) {
 
     const surfPriceUSD = surfPrice * adaPrice;
 
+    const poolBorrowedUSD = poolsArray.reduce((s, p) => s + p.totalBorrowedUSD, 0);
+    const posBorrowedUSD = positions.reduce((s, p) => s + p.totalOwedUSD, 0);
+    const posCollateralUSD = positions.reduce((s, p) => s + p.collateralValueUSD, 0);
+    const posNetValueUSD = positions.reduce((s, p) => s + p.netValueUSD, 0);
+    const totalSuppliedUSD = poolsArray.reduce((s, p) => s + p.totalSuppliedUSD, 0);
+
     return res.json({
       pools: poolsArray,
       positions,
       summary: {
         totalPositions: positions.length,
         totalPools: poolsArray.length,
-        totalSuppliedUSD: poolsArray.reduce((s, p) => s + p.totalSuppliedUSD, 0),
-        totalBorrowedUSD: positions.reduce((s, p) => s + p.totalOwedUSD, 0),
-        totalCollateralUSD: positions.reduce((s, p) => s + p.collateralValueUSD, 0),
-        totalNetValueUSD: positions.reduce((s, p) => s + p.netValueUSD, 0),
-        totalTVLUSD: poolsArray.reduce((s, p) => s + p.totalSuppliedUSD, 0) + positions.reduce((s, p) => s + p.collateralValueUSD, 0) - positions.reduce((s, p) => s + p.totalOwedUSD, 0),
+        totalSuppliedUSD,
+        totalBorrowedUSD: posBorrowedUSD,
+        totalCollateralUSD: posCollateralUSD,
+        totalNetValueUSD: posNetValueUSD,
+        totalBorrowedFromPools: poolBorrowedUSD,
+        totalTVLUSD: totalSuppliedUSD + posCollateralUSD - posBorrowedUSD,
+        totalTVLFromPools: totalSuppliedUSD + posCollateralUSD - poolBorrowedUSD,
         surfPrice,      // ada per SURF
         surfPriceUSD,
         adaPrice,       // usd per ADA

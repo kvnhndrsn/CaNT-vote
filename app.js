@@ -1675,10 +1675,12 @@ function renderSurfSummary(summary, pools, positions) {
   const toADA = (usd) => usd / adaPrice;
 
   const distinctBorrowers = new Set(positions.map(p => p.address)).size;
-  const totalBorrowADA = toADA(summary.totalBorrowedUSD);
+  const totalBorrowUSD = summary.totalBorrowedFromPools ?? summary.totalBorrowedUSD;
+  const totalBorrowADA = toADA(totalBorrowUSD);
   const totalCollatADA = toADA(summary.totalCollateralUSD);
   const totalSupplyADA = toADA(summary.totalSuppliedUSD);
-  const tvlADA = toADA(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD));
+  const tvlUSD = summary.totalTVLFromPools ?? summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD);
+  const tvlADA = toADA(tvlUSD);
   const borrowToSupply = totalSupplyADA > 0 ? totalBorrowADA / totalSupplyADA : 0;
   const collatRatio = totalBorrowADA > 0 ? totalCollatADA / totalBorrowADA : 0;
 
@@ -1712,7 +1714,7 @@ function renderSurfSummary(summary, pools, positions) {
         <div class="bento-cell bento-cell-lg">
           <div class="bento-label">Total Value Locked</div>
           <div class="bento-value">${fmtADA(tvlADA)}</div>
-          <div class="bento-sub">${fmtUSD(summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD))}</div>
+          <div class="bento-sub">${fmtUSD(tvlUSD)}</div>
         </div>
         <div class="bento-cell">
           <div class="bento-label">Total Supplied</div>
@@ -1722,7 +1724,7 @@ function renderSurfSummary(summary, pools, positions) {
         <div class="bento-cell">
           <div class="bento-label">Total Borrowed</div>
           <div class="bento-value">${fmtADA(totalBorrowADA)}</div>
-          <div class="bento-sub">${fmtUSD(summary.totalBorrowedUSD)}</div>
+          <div class="bento-sub">${fmtUSD(totalBorrowUSD)}</div>
         </div>
         <div class="bento-cell">
           <div class="bento-label">Total Collateral</div>
@@ -1902,6 +1904,11 @@ function renderPoolDeepDive(pools, summary) {
 
   let html = '<div class="summary-card summary-card-wide"><div class="summary-header"><h3>Pool Deep Dive</h3></div><div class="pool-grid">';
 
+  function poolAssetLogo(asset) {
+    if (!asset || !asset.policyId) return TOKEN_LOGOS.ADA;
+    return tokenLogoCache.get(asset.policyId + (asset.assetName || '')) || null;
+  }
+
   for (const p of pools) {
     const decimals = p.asset.decimals || 0;
     const suppliedADA = (p.totalSupplied || 0) / Math.pow(10, decimals) * (p.price || 1);
@@ -1910,16 +1917,23 @@ function renderPoolDeepDive(pools, summary) {
     const utilization = p.totalSupplied > 0 ? p.totalBorrowed / p.totalSupplied : 0;
     const suppliedUSD = toADA(suppliedADA) * adaPrice;
 
-    const assetLogo = (!p.asset || !p.asset.policyId) ? TOKEN_LOGOS.ADA : (tokenLogoCache.get(p.asset.policyId + (p.asset.assetName || '')) || null);
-    const iconHtml = assetLogo ? `<img class="pool-icon" src="${assetLogo}" alt="">` : '';
+    const supplyLogo = poolAssetLogo(p.asset);
+    const collLogos = (p.collateralAssets || []).slice(0, 2).map(c => poolAssetLogo({ policyId: c.policyId, assetName: c.assetName }));
+    const pileIcons = [];
+    if (supplyLogo) pileIcons.push(supplyLogo);
+    for (const logo of collLogos) if (logo) pileIcons.push(logo);
+    const pileHtml = pileIcons.length > 0
+      ? `<span class="pool-icon-pile">${pileIcons.map(src => `<img class="pool-icon" src="${escHtml(src)}" alt="">`).join('')}</span>`
+      : '';
 
+    const poolName = p.asset.ticker + (p.collateralAssets.length > 0 ? '/' + p.collateralAssets.slice(0, 2).map(c => c.ticker).join('+') + (p.collateralAssets.length > 2 ? '…' : '') : '');
     const collatTickers = p.collateralAssets.length > 0 ? p.collateralAssets.map(c => c.ticker).join(' + ') : '—';
 
     html += `
       <div class="pool-card">
         <div class="pool-card-header">
-          ${iconHtml}
-          <span class="pool-card-title">${escHtml(p.asset.ticker)}</span>
+          ${pileHtml}
+          <span class="pool-card-title">${escHtml(poolName)}</span>
           <span class="pool-card-price">${fmtADA(p.price || 1)}</span>
         </div>
         <div class="pool-card-body">
@@ -2097,10 +2111,12 @@ function renderTvlCompositionBar() {
   const { pools, positions, summary } = surfData;
   const adaPrice = summary.adaPrice || 1;
 
+  const borrowedUSD = summary.totalBorrowedFromPools ?? summary.totalBorrowedUSD;
+  const tvlUSD = summary.totalTVLFromPools ?? summary.totalTVLUSD ?? (summary.totalSuppliedUSD + summary.totalCollateralUSD - summary.totalBorrowedUSD);
   const suppliedADA = summary.totalSuppliedUSD / adaPrice;
   const collateralADA = summary.totalCollateralUSD / adaPrice;
-  const borrowedADA = summary.totalBorrowedUSD / adaPrice;
-  const tvlADA = (summary.totalTVLUSD ?? (suppliedADA + collateralADA - borrowedADA) * adaPrice) / adaPrice;
+  const borrowedADA = borrowedUSD / adaPrice;
+  const tvlADA = tvlUSD / adaPrice;
 
   const maxVal = Math.max(suppliedADA, collateralADA, tvlADA) || 1;
   const fmtADA = (v) => '₳' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2461,28 +2477,6 @@ async function renderAnalytics() {
     // 2b — TVL Composition stacked bar
     renderTvlCompositionBar();
 
-    // 3 — Prices
-    if (isAda) {
-      mkChart(document.querySelector('#chartPrices canvas'), {
-        type: 'line',
-        data: sci([
-          { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
-          { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
-        ]),
-        options: { ...base(), scales: { x: xAxis(), y: yAxis((v) => v >= 1 ? '$' + v.toFixed(2) : '¢' + (v * 100).toFixed(1)) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
-      });
-    } else {
-      mkChart(document.querySelector('#chartPrices canvas'), {
-        type: 'line',
-        data: sci([
-          { label: 'ADA (USD)', data: snap.map(s => s.ada_price), borderColor: C.blue, tension: 0.3, pointRadius: 0 },
-          { label: 'SURF (ADA)', data: snap.map(s => s.surf_price), borderColor: C.accent, tension: 0.3, pointRadius: 0 },
-          { label: 'SURF (USD)', data: snap.map(s => s.surf_price_usd), borderColor: C.purple, tension: 0.3, pointRadius: 0, borderDash: [3, 3] },
-        ]),
-        options: { ...base(), scales: { x: xAxis(), y: yAxis(usdTick) }, plugins: { legend: { ...lo(C.text), position: 'bottom' } } },
-      });
-    }
-
     // 4 — Avg LTV & APR
     mkChart(document.querySelector('#chartLtv canvas'), {
       type: 'line',
@@ -2498,15 +2492,21 @@ async function renderAnalytics() {
     const last = snap[snap.length - 1];
     const adaPrice = last.ada_price || 1;
     const bd = last.pool_breakdown || {};
-    const names = Object.keys(bd);
+    const tickerMap = {};
+    for (const [id, entry] of Object.entries(bd)) {
+      const t = entry?.ticker || id;
+      tickerMap[t] = (tickerMap[t] || 0) + toUnit(entry?.supplied_usd || 0, adaPrice);
+    }
+    const aggLabels = Object.keys(tickerMap).sort((a, b) => tickerMap[b] - tickerMap[a]);
+    const aggData = aggLabels.map(t => tickerMap[t]);
     const poolColors = [C.accent, C.blue, C.green, C.amber, C.purple, C.cyan, C.red];
     mkChart(document.querySelector('#chartPoolsBreakdown canvas'), {
       type: 'doughnut',
       data: {
-        labels: names.map(id => bd[id]?.ticker || id),
+        labels: aggLabels,
         datasets: [{
-          data: names.map(id => toUnit(bd[id]?.supplied_usd || 0, adaPrice)),
-          backgroundColor: names.map((_, i) => poolColors[i % poolColors.length]),
+          data: aggData,
+          backgroundColor: aggLabels.map((_, i) => poolColors[i % poolColors.length]),
           borderWidth: 0,
         }],
       },
