@@ -1529,6 +1529,7 @@ $$('.tab').forEach(tab => {
     $('#surfView').style.display = view === 'surf' ? '' : 'none';
     $('#analyticsView').style.display = view === 'analytics' ? '' : 'none';
     $('#activityView').style.display = view === 'activity' ? '' : 'none';
+    $('#surfTokenView').style.display = view === 'surf-token' ? '' : 'none';
     if (view === 'portfolio') {
       if (!state.api) {
         $('#portfolioContent').innerHTML = '<div class="empty-state"><p>Connect your wallet to view portfolio.</p></div>';
@@ -1536,7 +1537,7 @@ $$('.tab').forEach(tab => {
         fetchPortfolio();
       }
     }
-    if (view === 'surf' || view === 'analytics') {
+    if (view === 'surf' || view === 'analytics' || view === 'surf-token') {
       await fetchSurfDashboard();
       if (surfRefreshInterval) clearInterval(surfRefreshInterval);
       surfRefreshInterval = setInterval(fetchSurfDashboard, 120000);
@@ -1554,6 +1555,9 @@ $$('.tab').forEach(tab => {
     }
     if (view === 'analytics') {
       renderAnalytics();
+    }
+    if (view === 'surf-token') {
+      renderSurfTokenStats();
     }
     if (view === 'activity') {
       fetchActivity();
@@ -2388,6 +2392,140 @@ function renderActivity(data, container, pagination) {
       activityPage = parseInt(btn.dataset.page);
       fetchActivity();
     });
+  });
+}
+
+/* ---------- SURF Token Stats ---------- */
+
+function renderSurfTokenStats() {
+  const token = surfData?.token;
+  if (!token) {
+    $('#tokenSummary').innerHTML = '<div class="empty-state"><p>Token data not available.</p></div>';
+    return;
+  }
+
+  const { totalSupply, holders, priceUSD, price, marketCapUSD, marketCapADA, avgBalance, medianBalance, top10ConcentrationPct, buckets, topHolders } = token;
+
+  const fmt = (v) => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtInt = (v) => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const fmtShort = (v) => {
+    if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+    if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+    return v.toFixed(2);
+  };
+
+  $('#tokenSummary').innerHTML = `
+    <div class="summary-card">
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <div class="summary-stat-label">Total Supply</div>
+          <div class="summary-stat-value">${fmtShort(totalSupply)} SURF</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Holders</div>
+          <div class="summary-stat-value">${fmtInt(holders)}</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Price</div>
+          <div class="summary-stat-value">$${fmt(priceUSD)}</div>
+          <div class="summary-sub">${fmt(price)} ADA</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Market Cap</div>
+          <div class="summary-stat-value">$${fmtShort(marketCapUSD)}</div>
+          <div class="summary-sub">${fmtShort(marketCapADA)} ADA</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Avg Balance</div>
+          <div class="summary-stat-value">${fmtShort(avgBalance)} SURF</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Median Balance</div>
+          <div class="summary-stat-value">${fmtShort(medianBalance)} SURF</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">Top 10 Concentration</div>
+          <div class="summary-stat-value">${fmt(top10ConcentrationPct)}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const bucketLabels = ['<1K', '1K-10K', '10K-100K', '100K-1M', '>1M'];
+  const bucketKeys = ['under1K', 'under10K', 'under100K', 'under1M', 'over1M'];
+  const bucketValues = bucketKeys.map(k => buckets?.[k] || 0);
+
+  $('#tokenDetails').innerHTML = `
+    <div class="token-buckets">
+      <div class="section-title">Balance Distribution</div>
+      <div class="buckets-grid">
+        ${bucketLabels.map((label, i) => `
+          <div class="bucket-bar">
+            <div class="bucket-label">${label}</div>
+            <div class="bucket-count">${fmtInt(bucketValues[i])}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  if (topHolders && topHolders.length > 0) {
+    let html = '<table class="surf-table"><thead><tr><th>#</th><th>Address</th><th>Balance</th><th>% of Supply</th></tr></thead><tbody>';
+    topHolders.forEach((h, i) => {
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td title="${escHtml(h.address)}">${escHtml(displayAddr(h.address))}</td>
+        <td class="num">${fmtShort(h.balance)} SURF</td>
+        <td class="num">${fmt(h.pct)}%</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    $('#tokenHoldersTable').innerHTML = html;
+  }
+
+  renderTokenDistChart(bucketLabels, bucketValues);
+}
+
+async function renderTokenDistChart(labels, values) {
+  const canvas = document.querySelector('#tokenDistChart canvas');
+  if (!canvas) return;
+
+  await ensureChart();
+  if (!window.Chart) return;
+
+  if (window.tokenDistChartInstance) {
+    window.tokenDistChartInstance.destroy();
+    window.tokenDistChartInstance = null;
+  }
+
+  const isDark = document.body.classList.contains('dark');
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  const textColor = isDark ? '#aaa' : '#666';
+
+  window.tokenDistChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Holders',
+        data: values,
+        backgroundColor: ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0'],
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' holders' } },
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor, beginAtZero: true } },
+      },
+    },
   });
 }
 

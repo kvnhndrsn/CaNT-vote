@@ -23,6 +23,7 @@
       <button class="tab" data-view="surf"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Positions</button>
       <button class="tab" data-view="analytics"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Analytics</button>
       <button class="tab" data-view="activity"><img class="tab-surf-icon" src="/img/surf.svg" alt=""> Activity</button>
+      <button class="tab" data-view="surf-token">SURF</button>
     </div>
     <div class="nav-actions">
       <button class="btn btn-sm btn-ghost" id="themeBtn">☀</button>
@@ -145,6 +146,20 @@
       <div class="empty-state"><p>Loading activity...</p></div>
     </div>
     <div class="activity-pagination" id="activityPagination"></div>
+  </div>
+  <div id="surfTokenView" style="display:none">
+    <div class="token-summary" id="tokenSummary"></div>
+    <div class="token-details" id="tokenDetails"></div>
+    <div class="token-holders-section">
+      <div class="section-title">Top Holders</div>
+      <div class="table-wrap" id="tokenHoldersTable"><div class="empty-state"><p>Loading...</p></div></div>
+    </div>
+    <div class="token-chart-section">
+      <div class="section-title">Holder Distribution</div>
+      <div class="chart-card" id="tokenDistChart">
+        <div class="chart-wrap"><canvas></canvas></div>
+      </div>
+    </div>
   </div>
 </main>
 

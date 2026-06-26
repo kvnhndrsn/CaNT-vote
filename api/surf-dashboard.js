@@ -1,9 +1,66 @@
+import { koiosPost, defaultKoiosUrl } from '../lib/koios.js';
+
 const SURF_API = 'https://surflending.org';
+const SURF_POLICY = '2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80';
+const SURF_ASSET = '464c4f57';
+const SURF_DECIMALS = 6;
 
 async function surfFetch(path) {
   const res = await fetch(SURF_API + path);
   if (!res.ok) return null;
   return res.json();
+}
+
+async function fetchSurfHolders(koiosUrl) {
+  try {
+    const result = await koiosPost(koiosUrl + '/asset_address_list', {
+      _asset_policy: SURF_POLICY,
+      _asset_name: SURF_ASSET,
+    }, 'surf-holders');
+    if (!Array.isArray(result)) return null;
+
+    const holders = result
+      .filter(h => h.quantity && BigInt(h.quantity) > 0n)
+      .map(h => ({ address: h.address, balance: h.quantity }));
+
+    const totalWithDecimals = holders.reduce((s, h) => s + Number(h.balance), 0);
+    const totalTokens = totalWithDecimals / Math.pow(10, SURF_DECIMALS);
+
+    const sorted = holders.sort((a, b) => Number(b.balance) - Number(a.balance));
+    const top10 = sorted.slice(0, 10).map(h => ({
+      address: h.address,
+      balance: Number(h.balance) / Math.pow(10, SURF_DECIMALS),
+      pct: totalTokens > 0 ? (Number(h.balance) / totalWithDecimals) * 100 : 0,
+    }));
+
+    const top10Count = sorted.slice(0, 10).reduce((s, h) => s + Number(h.balance), 0);
+    const balances = sorted.map(h => Number(h.balance));
+    const avgBalance = holders.length > 0 ? totalWithDecimals / holders.length : 0;
+
+    let low = 0, midLow = 0, mid = 0, midHigh = 0, high = 0;
+    for (const bal of balances) {
+      const t = bal / Math.pow(10, SURF_DECIMALS);
+      if (t < 1000) low++;
+      else if (t < 10000) midLow++;
+      else if (t < 100000) mid++;
+      else if (t < 1000000) midHigh++;
+      else high++;
+    }
+
+    return {
+      holders: holders.length,
+      totalSupply: totalTokens,
+      topHolders: top10,
+      top10ConcentrationPct: totalTokens > 0 ? (top10Count / totalWithDecimals) * 100 : 0,
+      avgBalance,
+      medianBalance: balances.length > 0
+        ? [...balances].sort((a, b) => a - b)[Math.floor(balances.length / 2)] / Math.pow(10, SURF_DECIMALS)
+        : 0,
+      buckets: { under1K: low, under10K: midLow, under100K: mid, under1M: midHigh, over1M: high },
+    };
+  } catch (e) {
+    return null;
+  }
 }
 
 function decodeAsset(policyId, assetNameHex) {
@@ -30,7 +87,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [poolData, posData, surfPriceData, adaPriceData, stakingInfo, stakingApy, stakingChart] = await Promise.all([
+    const network = process.env.BLOCKFROST_NETWORK || 'mainnet';
+    const koiosUrl = process.env.KOIOS_API_URL || defaultKoiosUrl(network);
+
+    const [poolData, posData, surfPriceData, adaPriceData, stakingInfo, stakingApy, stakingChart, tokenData] = await Promise.all([
       surfFetch('/api/getAllPoolInfos'),
       surfFetch('/api/getAllPositions' + (address ? `?address=${encodeURIComponent(address)}` : '')),
       surfFetch('/api/getSurfPrice'),
@@ -38,6 +98,7 @@ export default async function handler(req, res) {
       surfFetch('/api/staking/getInfo' + (address ? `?address=${encodeURIComponent(address)}` : '')),
       surfFetch('/api/staking/getAPY'),
       surfFetch('/api/staking/getRewardsChart' + (address ? `?address=${encodeURIComponent(address)}` : '')),
+      fetchSurfHolders(koiosUrl),
     ]);
 
     if (!poolData) {
@@ -187,6 +248,8 @@ export default async function handler(req, res) {
       };
     });
 
+    const surfPriceUSD = surfPrice * adaPrice;
+
     return res.json({
       pools: poolsArray,
       positions,
@@ -198,7 +261,7 @@ export default async function handler(req, res) {
         totalCollateralUSD: positions.reduce((s, p) => s + p.collateralValueUSD, 0),
         totalNetValueUSD: positions.reduce((s, p) => s + p.netValueUSD, 0),
         surfPrice,      // ada per SURF
-        surfPriceUSD: surfPrice * adaPrice,
+        surfPriceUSD,
         adaPrice,       // usd per ADA
         fetchedAt: Date.now(),
       },
@@ -207,6 +270,15 @@ export default async function handler(req, res) {
         apy: stakingApy || null,
         rewardsChart: stakingChart?.data || [],
       },
+      token: tokenData ? {
+        ...tokenData,
+        price: surfPrice,
+        priceUSD: surfPriceUSD,
+        marketCapADA: surfPrice * (tokenData?.totalSupply || 0),
+        marketCapUSD: surfPriceUSD * (tokenData?.totalSupply || 0),
+        policyId: SURF_POLICY,
+        fingerprint: 'asset1j0x9p32zv67qjgjq7j0v7q5j0x9p32zv67qjgj',
+      } : null,
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
